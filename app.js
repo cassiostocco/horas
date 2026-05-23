@@ -289,6 +289,16 @@ function app() {
 
       // Called when auto sign-in can't run silently — let user click manually
       window._gauthLoadingDone = () => { this.gauth.loading = false; };
+
+      // When app becomes visible (user returns to tab/PWA), pull fresh data from Sheets
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && this.gauth.unlocked) {
+          this.tryGetSheetsToken().then(ok => {
+            if (ok) this.syncOnSignIn();
+            else this.needsSheetsAuth = true;
+          });
+        }
+      });
     },
 
     loadUserData() {
@@ -341,8 +351,12 @@ function app() {
     },
 
     async autoSync() {
+      if (this.syncStatus === 'syncing') return;
       const hasToken = this.gauth.accessToken && Date.now() < this.gauth.tokenExpiry;
-      if (!hasToken || this.syncStatus === 'syncing') return;
+      if (!hasToken) {
+        const ok = await this.tryGetSheetsToken();
+        if (!ok) return;
+      }
       await this.syncToSheets(true);
     },
 
@@ -397,6 +411,7 @@ function app() {
           if (resp.error) { resolve(false); return; }
           this.gauth.accessToken = resp.access_token;
           this.gauth.tokenExpiry = Date.now() + (resp.expires_in - 60) * 1000;
+          this.needsSheetsAuth = false;
           resolve(true);
         };
         tokenClient.requestAccessToken({ prompt: '' });
