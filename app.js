@@ -674,6 +674,10 @@ function app() {
       const head = showTotals
         ? [[this.t('date'),this.t('entryTime'),this.t('lunchOut'),this.t('lunchReturn'),this.t('exitTime'),this.t('dayTotal'),this.t('weekSubtotal'),'OT']]
         : [[this.t('date'),this.t('entryTime'),this.t('lunchOut'),this.t('lunchReturn'),this.t('exitTime')]];
+      // Column widths (mm) sized to content, not stretched to page width
+      const colStyles = showTotals
+        ? {0:{cellWidth:28},1:{cellWidth:15},2:{cellWidth:15},3:{cellWidth:15},4:{cellWidth:15},5:{cellWidth:16},6:{cellWidth:22},7:{cellWidth:14}}
+        : {0:{cellWidth:32},1:{cellWidth:20},2:{cellWidth:20},3:{cellWidth:20},4:{cellWidth:20}};
       const tableStyles = showTotals ? {fontSize:7,cellPadding:1.2} : {fontSize:8,cellPadding:1.5};
       for (const sec of this.reportData) {
         if (y>255) {doc.addPage(); y=14;}
@@ -686,7 +690,7 @@ function app() {
           : [r.date,r.entryTime,r.lunchOut,r.lunchReturn,r.exitTime]
         );
         if (showTotals) body.push([this.t('companyTotal'),'','','','',this.fmt(sec.totalMinutes),'',sec.overtimeMinutes>0?this.fmt(sec.overtimeMinutes):'']);
-        doc.autoTable({startY:y,head,body,styles:tableStyles,headStyles:{fillColor:[26,54,93]},margin:{left:14,right:14}});
+        doc.autoTable({startY:y,head,body,styles:tableStyles,headStyles:{fillColor:[26,54,93]},columnStyles:colStyles,margin:{left:14,right:14},tableWidth:'wrap'});
         y=doc.lastAutoTable.finalY+5;
         if (showTotals) {
           doc.setFontSize(8);
