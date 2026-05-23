@@ -106,6 +106,12 @@
 
 <main>
 
+  <!-- Sync auth banner — shown when silent token failed (e.g. mobile) -->
+  <div class="sync-auth-banner" x-show="gauth.unlocked && needsSheetsAuth">
+    <span x-text="t('syncAuthBanner')"></span>
+    <button class="btn-sync-auth" @click="authorizeSheetsAndSync()" x-text="t('syncAuthBtn')"></button>
+  </div>
+
   <!-- ══ TAB: ENTRIES ══════════════════════════════════════ -->
   <div x-show="tab==='entries'">
 

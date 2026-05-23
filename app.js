@@ -122,6 +122,8 @@ const i18n = {
     weekOverview: 'Resumo da semana',
     today: 'Hoje',
     errorInvalidTime: 'Horário inválido. Digite no formato HH:MM (ex: 08:30).',
+    syncAuthBanner: 'Toque aqui para ativar a sincronização automática entre dispositivos.',
+    syncAuthBtn: 'Ativar sincronização',
   },
   en: {
     appTitle: 'Work Hours Tracker',
@@ -211,6 +213,8 @@ const i18n = {
     weekOverview: 'Week overview',
     today: 'Today',
     errorInvalidTime: 'Invalid time. Use HH:MM format (e.g. 08:30).',
+    syncAuthBanner: 'Tap here to enable automatic sync across devices.',
+    syncAuthBtn: 'Enable sync',
   }
 };
 
@@ -247,6 +251,7 @@ function app() {
 
     showSettings: false,
     syncStatus: '', // '' | 'syncing' | 'done' | 'error' | 'restored' | 'empty'
+    needsSheetsAuth: false,
     _syncTimer: null,
 
     // ── lifecycle ────────────────────────────────────────────
@@ -272,7 +277,10 @@ function app() {
           this.loadUserData();
           this.gauth.unlocked = true;
           // Try to get Sheets token silently, then auto-sync
-          this.tryGetSheetsToken().then(ok => { if (ok) this.syncOnSignIn(); });
+          this.tryGetSheetsToken().then(ok => {
+            if (ok) { this.syncOnSignIn(); }
+            else { this.needsSheetsAuth = true; }
+          });
         } catch (_) {
           this.gauth.error = this.t('signInError');
         }
@@ -448,6 +456,14 @@ function app() {
       // Try silent first; if no prior consent, ask explicitly (popup allowed — triggered by user click)
       const ok = await ask('');
       return ok || ask('consent');
+    },
+
+    // Called when user taps the "authorize sync" banner (user gesture allows popup)
+    async authorizeSheetsAndSync() {
+      const ok = await this.ensureToken();
+      if (!ok) return;
+      this.needsSheetsAuth = false;
+      await this.syncOnSignIn();
     },
 
     // ── Google Sheets sync ───────────────────────────────────

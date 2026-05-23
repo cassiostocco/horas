@@ -98,6 +98,20 @@ body {
   line-height: 1.5;
 }
 
+/* ── Sync auth banner ── */
+.sync-auth-banner {
+  display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
+  background: #fffbeb; border: 1px solid #f6ad55; border-radius: 10px;
+  padding: .75rem 1rem; margin-bottom: 1rem; font-size: .875rem; color: #744210;
+}
+.sync-auth-banner span { flex: 1; }
+.btn-sync-auth {
+  background: #ed8936; color: #fff; border: none; border-radius: 7px;
+  padding: .45rem 1rem; font-size: .85rem; font-weight: 600; cursor: pointer;
+  white-space: nowrap;
+}
+.btn-sync-auth:active { opacity: .85; }
+
 /* ── Sync status ── */
 .sync-status {
   background: #f0fff4; color: #276749; border-radius: 7px;
