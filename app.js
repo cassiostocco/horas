@@ -1,6 +1,7 @@
 const CLIENT_ID = '750076288563-59u39gs5eiucjt6kdcjvfne0h8i90bf9.apps.googleusercontent.com';
 
 let tokenClient = null;
+let _gauthCallback = null; // queued when Alpine init() runs before GIS loads
 
 // Called by Google Identity Services script onload
 function initGoogleSignIn() {
@@ -14,6 +15,7 @@ function initGoogleSignIn() {
     ].join(' '),
     callback: '' // set per-request
   });
+  if (_gauthCallback) { _gauthCallback(); _gauthCallback = null; }
 }
 
 // ── i18n ──────────────────────────────────────────────────────
@@ -99,6 +101,9 @@ const i18n = {
     hostingStep6: '6. Compartilhe com seus colegas',
     closeModal: 'Fechar',
     showTotals: 'Incluir totais de horas no relatório',
+    weekOverview: 'Resumo da semana',
+    today: 'Hoje',
+    errorInvalidTime: 'Horário inválido. Digite no formato HH:MM (ex: 08:30).',
   },
   en: {
     appTitle: 'Work Hours Tracker',
@@ -181,6 +186,9 @@ const i18n = {
     hostingStep6: '6. Share the link with your coworkers',
     closeModal: 'Close',
     showTotals: 'Include hour totals in report',
+    weekOverview: 'Week overview',
+    today: 'Today',
+    errorInvalidTime: 'Invalid time. Use HH:MM format (e.g. 08:30).',
   }
 };
 
@@ -203,6 +211,7 @@ function app() {
     reportData: [],
     reportTotals: { total: 0, overtime: 0 },
     reportGenerated: false,
+    weekNav: 0, // week offset from current (0 = this week, -1 = last week, …)
 
     // Google auth
     gauth: {
@@ -222,11 +231,17 @@ function app() {
     init() {
       this.lang = localStorage.getItem('horas_lang') || 'pt';
 
-      // Restore saved user (for "welcome back" screen)
       try {
         const saved = localStorage.getItem('horas_user');
         if (saved) this.gauth.user = JSON.parse(saved);
       } catch (_) {}
+
+      // Attempt silent sign-in if user was here before
+      if (this.gauth.user) {
+        const doSilent = () => this.signInSilent();
+        if (tokenClient) doSilent();
+        else _gauthCallback = doSilent;
+      }
     },
 
     loadUserData() {
@@ -312,6 +327,19 @@ function app() {
 
       // returning user: try silent; new user: show consent
       tokenClient.requestAccessToken({ prompt: this.gauth.user ? '' : 'consent' });
+    },
+
+    signInSilent() {
+      this.gauth.loading = true;
+      tokenClient.callback = async (response) => {
+        if (response.error) { this.gauth.loading = false; return; }
+        this.gauth.accessToken = response.access_token;
+        this.gauth.tokenExpiry = Date.now() + (response.expires_in - 60) * 1000;
+        this.loadUserData();
+        this.gauth.unlocked = true;
+        this.gauth.loading = false;
+      };
+      tokenClient.requestAccessToken({ prompt: '' });
     },
 
     signOut() {
@@ -491,6 +519,71 @@ function app() {
       return half==='1' ? `1–15 ${mn} ${y}` : `16–31 ${mn} ${y}`;
     },
 
+    // ── time input helpers ───────────────────────────────────
+
+    parseTime(val) {
+      if (!val) return '';
+      const trimmed = val.trim();
+      if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
+        const [h, m] = trimmed.split(':').map(Number);
+        return (h <= 23 && m <= 59) ? String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') : '';
+      }
+      const d = trimmed.replace(/\D/g, '');
+      if (d.length === 1 || d.length === 2) {
+        const h = parseInt(d, 10);
+        return h <= 23 ? String(h).padStart(2,'0') + ':00' : '';
+      }
+      if (d.length === 3) {
+        const h = parseInt(d[0], 10), m = parseInt(d.slice(1), 10);
+        return (h <= 23 && m <= 59) ? String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') : '';
+      }
+      if (d.length >= 4) {
+        const h = parseInt(d.slice(0,2), 10), m = parseInt(d.slice(2,4), 10);
+        return (h <= 23 && m <= 59) ? String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') : '';
+      }
+      return '';
+    },
+
+    fmtTimeField(field) {
+      this.form[field] = this.parseTime(this.form[field]);
+    },
+
+    // ── week overview ────────────────────────────────────────
+
+    weekNavDays() {
+      const today = new Date();
+      const dow = today.getDay();
+      const toMon = dow === 0 ? -6 : 1 - dow;
+      const mon = new Date(today);
+      mon.setDate(today.getDate() + toMon + this.weekNav * 7);
+      const todayIso = todayStr();
+      return Array.from({length: 6}, (_, i) => {
+        const d = new Date(mon);
+        d.setDate(mon.getDate() + i);
+        const iso = d.toISOString().slice(0, 10);
+        const dayEntries = this.entries.filter(e => e.date === iso);
+        const total = dayEntries.reduce((s, e) => s + this.calcMinutes(e), 0);
+        return {
+          iso, day: d.getDate(),
+          label: this.t('weekdayNames')[d.getDay()],
+          hasEntry: dayEntries.length > 0,
+          total,
+          isFuture: iso > todayIso,
+          isToday: iso === todayIso
+        };
+      });
+    },
+
+    weekNavLabel() {
+      const days = this.weekNavDays();
+      return this.fmtDate(days[0].iso) + ' – ' + this.fmtDate(days[5].iso);
+    },
+
+    goToDay(iso) {
+      this.form.date = iso;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+
     // ── entries ──────────────────────────────────────────────
 
     sortedEntries() {
@@ -504,6 +597,8 @@ function app() {
       if (!this.form.companyId) return this.t('errorNoCompany');
       if (!this.form.date) return this.t('errorNoDate');
       if (!this.form.entryTime || !this.form.exitTime) return this.t('errorNoTimes');
+      if (!/^\d{2}:\d{2}$/.test(this.form.entryTime) || !/^\d{2}:\d{2}$/.test(this.form.exitTime))
+        return this.t('errorInvalidTime');
       return '';
     },
 

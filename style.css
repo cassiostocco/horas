@@ -461,6 +461,51 @@ tr.week-sub:hover td { background: #e0e7ff; }
 .check-chip:hover { border-color: #bee3f8; background: #ebf8ff; }
 .check-chip input { accent-color: #3182ce; }
 
+/* ── Week overview card ── */
+.week-card { padding: 1rem 1.25rem; }
+.week-nav-bar {
+  display: flex; align-items: center; gap: .5rem; margin-bottom: .875rem;
+}
+.week-nav-label {
+  flex: 1; text-align: center; font-weight: 600; font-size: .88rem; color: #2d3748;
+}
+.week-today-btn { font-size: .75rem; padding: .2rem .55rem; white-space: nowrap; }
+
+.week-grid {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: .4rem;
+}
+.week-cell {
+  border-radius: 9px; padding: .5rem .2rem; text-align: center;
+  border: 1.5px solid #e2e8f0; cursor: pointer;
+  transition: transform .1s, box-shadow .1s;
+  user-select: none;
+}
+.week-cell:hover:not(.wc-future) { transform: translateY(-2px); box-shadow: 0 3px 8px rgba(0,0,0,.1); }
+.wc-name { font-size: .65rem; font-weight: 700; text-transform: uppercase; color: #718096; margin-bottom: .15rem; }
+.wc-day { font-size: 1.05rem; font-weight: 800; color: #1a202c; }
+.wc-total { font-size: .72rem; font-weight: 600; margin-top: .2rem; min-height: .9rem; }
+
+/* has entry */
+.wc-has { background: #f0fff4; border-color: #9ae6b4; }
+.wc-has .wc-total { color: #276749; }
+/* missing entry (past day) */
+.wc-missing { background: #fff5f5; border-color: #fed7d7; }
+.wc-missing .wc-day { color: #c53030; }
+.wc-missing .wc-total { color: #c53030; }
+/* future day */
+.wc-future { background: #f7fafc; border-color: #e2e8f0; opacity: .45; cursor: default; }
+/* today highlight */
+.wc-today { box-shadow: 0 0 0 2px #3182ce !important; }
+.wc-today .wc-name { color: #3182ce; }
+
+@media (max-width: 480px) {
+  .week-grid { gap: .2rem; }
+  .week-cell { padding: .4rem .1rem; border-radius: 7px; }
+  .wc-name { font-size: .58rem; }
+  .wc-day { font-size: .9rem; }
+  .wc-total { font-size: .62rem; }
+}
+
 /* ── Footer ── */
 footer {
   text-align: center;

@@ -105,6 +105,29 @@
 
   <!-- ══ TAB: ENTRIES ══════════════════════════════════════ -->
   <div x-show="tab==='entries'">
+
+    <!-- Week overview -->
+    <div class="card week-card">
+      <div class="week-nav-bar">
+        <button class="btn-icon" @click="weekNav--">&#8592;</button>
+        <span class="week-nav-label" x-text="weekNavLabel()"></span>
+        <button class="btn-icon" @click="weekNav++" :disabled="weekNav >= 0">&#8594;</button>
+        <button class="btn-icon week-today-btn" x-show="weekNav < 0" @click="weekNav = 0"
+          x-text="t('today')"></button>
+      </div>
+      <div class="week-grid">
+        <template x-for="d in weekNavDays()" :key="d.iso">
+          <div class="week-cell"
+               :class="{'wc-has': d.hasEntry, 'wc-missing': !d.hasEntry && !d.isFuture, 'wc-future': d.isFuture, 'wc-today': d.isToday}"
+               @click="!d.isFuture && goToDay(d.iso)">
+            <div class="wc-name" x-text="d.label"></div>
+            <div class="wc-day" x-text="d.day"></div>
+            <div class="wc-total" x-text="d.hasEntry ? fmt(d.total) : (d.isFuture ? '' : '—')"></div>
+          </div>
+        </template>
+      </div>
+    </div>
+
     <div class="card">
       <h2 x-text="editingId ? t('editEntry') : t('newEntry')"></h2>
       <div class="info-msg" x-show="companies.length===0" x-text="t('noCompanyForEntry')"></div>
@@ -125,11 +148,13 @@
           </div>
           <div class="field">
             <label class="field-label" x-text="t('entryTime')"></label>
-            <input type="time" x-model="form.entryTime">
+            <input type="text" inputmode="numeric" placeholder="HH:MM"
+              x-model="form.entryTime" @blur="fmtTimeField('entryTime')">
           </div>
           <div class="field">
             <label class="field-label" x-text="t('exitTime')"></label>
-            <input type="time" x-model="form.exitTime">
+            <input type="text" inputmode="numeric" placeholder="HH:MM"
+              x-model="form.exitTime" @blur="fmtTimeField('exitTime')">
           </div>
           <div class="field field-full">
             <label class="checkbox-row">
@@ -139,11 +164,13 @@
           </div>
           <div class="field" x-show="!form.noLunch">
             <label class="field-label" x-text="t('lunchOut')"></label>
-            <input type="time" x-model="form.lunchOut">
+            <input type="text" inputmode="numeric" placeholder="HH:MM"
+              x-model="form.lunchOut" @blur="fmtTimeField('lunchOut')">
           </div>
           <div class="field" x-show="!form.noLunch">
             <label class="field-label" x-text="t('lunchReturn')"></label>
-            <input type="time" x-model="form.lunchReturn">
+            <input type="text" inputmode="numeric" placeholder="HH:MM"
+              x-model="form.lunchReturn" @blur="fmtTimeField('lunchReturn')">
           </div>
         </div>
         <div class="day-preview" x-show="form.entryTime && form.exitTime">
