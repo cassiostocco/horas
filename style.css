@@ -133,9 +133,11 @@ body {
 }
 @media (max-width: 480px) { .user-name { display: none; } }
 
-/* ── Sheets button ── */
+/* ── Sheets / Restore buttons ── */
 .btn-sheets { color: #276749; border-color: #9ae6b4; }
 .btn-sheets:hover { background: #f0fff4; }
+.btn-restore { color: #2b6cb0; border-color: #bee3f8; }
+.btn-restore:hover { background: #ebf8ff; }
 
 /* ── Header ── */
 header {

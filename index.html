@@ -291,9 +291,16 @@
           :disabled="syncStatus==='syncing'"
           x-text="syncStatus==='syncing' ? t('syncing') : t('syncSheets')">
         </button>
+        <button class="btn-secondary btn-restore"
+          @click="restoreFromSheets()"
+          :disabled="syncStatus==='syncing'"
+          x-text="syncStatus==='syncing' ? t('syncing') : t('restoreSheets')">
+        </button>
       </div>
       <div class="sync-status" x-show="syncStatus==='done'" x-text="t('syncDone')"></div>
+      <div class="sync-status" x-show="syncStatus==='restored'" x-text="t('restoreOk')"></div>
       <div class="sync-status sync-error" x-show="syncStatus==='error'" x-text="t('syncError')"></div>
+      <div class="sync-status sync-error" x-show="syncStatus==='empty'" x-text="t('restoreEmpty')"></div>
     </div>
 
     <div x-show="reportGenerated">

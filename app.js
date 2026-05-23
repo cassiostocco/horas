@@ -101,10 +101,14 @@ const i18n = {
     signInError: 'Erro ao entrar. Tente novamente.',
     logout: 'Sair',
     welcomeBack: 'Bem-vindo de volta',
-    // sheets sync
+    // sheets sync / restore
     syncing: 'Sincronizando...',
     syncDone: 'Backup salvo no Google Sheets!',
     syncError: 'Erro ao sincronizar. Tente novamente.',
+    restoreSheets: 'Restaurar do Sheets',
+    restoreConfirm: 'Restaurar dados do backup no Google Sheets? Os dados locais serão substituídos.',
+    restoreOk: 'Dados restaurados do Google Sheets!',
+    restoreEmpty: 'Nenhum backup encontrado no Sheets. Faça um backup primeiro no PC.',
     // hosting
     settings: 'Publicar no GitHub Pages',
     hostingStep1: '1. Crie uma conta em github.com (gratuito)',
@@ -186,10 +190,14 @@ const i18n = {
     signInError: 'Sign-in error. Please try again.',
     logout: 'Sign out',
     welcomeBack: 'Welcome back',
-    // sheets sync
+    // sheets sync / restore
     syncing: 'Syncing...',
     syncDone: 'Backup saved to Google Sheets!',
     syncError: 'Sync error. Please try again.',
+    restoreSheets: 'Restore from Sheets',
+    restoreConfirm: 'Restore data from Google Sheets backup? Local data will be replaced.',
+    restoreOk: 'Data restored from Google Sheets!',
+    restoreEmpty: 'No backup found in Sheets. Do a backup from your PC first.',
     // hosting
     settings: 'Publish on GitHub Pages',
     hostingStep1: '1. Create an account at github.com (free)',
@@ -382,9 +390,25 @@ function app() {
           { headers: { Authorization: `Bearer ${this.gauth.accessToken}` } }
         );
         if (res.ok) return sheetId;
+        localStorage.removeItem(key); // stale id
       }
 
-      // Create new spreadsheet
+      // Search Drive for an existing "Backup Horas" created by this app
+      const q = encodeURIComponent("name='Backup Horas' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false");
+      const search = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)&pageSize=1`,
+        { headers: { Authorization: `Bearer ${this.gauth.accessToken}` } }
+      );
+      if (search.ok) {
+        const sd = await search.json();
+        if (sd.files?.length > 0) {
+          sheetId = sd.files[0].id;
+          localStorage.setItem(key, sheetId);
+          return sheetId;
+        }
+      }
+
+      // Create new spreadsheet with Lancamentos, Log, and Config sheets
       const res = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
         method: 'POST',
         headers: {
@@ -395,7 +419,8 @@ function app() {
           properties: { title: 'Backup Horas' },
           sheets: [
             { properties: { title: 'Lancamentos', index: 0 } },
-            { properties: { title: 'Log', index: 1 } }
+            { properties: { title: 'Log', index: 1 } },
+            { properties: { title: 'Config', index: 2 } }
           ]
         })
       });
@@ -450,11 +475,64 @@ function app() {
           body: JSON.stringify({ values: [[new Date().toLocaleString('pt-BR'), this.entries.length, this.companies.length]] })
         });
 
+        // Write full JSON to Config sheet for cross-device restore
+        const jsonBackup = JSON.stringify({ companies: this.companies, entries: this.entries });
+        const configRes = await fetch(`${base}/values/Config!A1?valueInputOption=RAW`, {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ values: [[jsonBackup]] })
+        });
+        if (!configRes.ok) {
+          // Config sheet doesn't exist (old spreadsheet) — create it then retry
+          await fetch(`${base}:batchUpdate`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requests: [{ addSheet: { properties: { title: 'Config' } } }] })
+          });
+          await fetch(`${base}/values/Config!A1?valueInputOption=RAW`, {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ values: [[jsonBackup]] })
+          });
+        }
+
         this.syncStatus = 'done';
       } catch (_) {
         this.syncStatus = 'error';
       }
       setTimeout(() => { this.syncStatus = ''; }, 5000);
+    },
+
+    async restoreFromSheets() {
+      if (!confirm(this.t('restoreConfirm'))) return;
+      this.syncStatus = 'syncing';
+      try {
+        const ok = await this.ensureToken();
+        if (!ok) { this.syncStatus = 'error'; return; }
+
+        const sheetId = await this.findOrCreateSpreadsheet();
+        const token = this.gauth.accessToken;
+
+        const res = await fetch(
+          `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Config!A1`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!res.ok) { this.syncStatus = 'empty'; return; }
+
+        const data = await res.json();
+        const jsonStr = data.values?.[0]?.[0];
+        if (!jsonStr) { this.syncStatus = 'empty'; return; }
+
+        const parsed = JSON.parse(jsonStr);
+        this.companies = parsed.companies || [];
+        this.entries = parsed.entries || [];
+        this.persist();
+        this.report.selectedCompanies = this.companies.map(c => c.id);
+        this.syncStatus = 'restored';
+      } catch (_) {
+        this.syncStatus = 'error';
+      }
+      setTimeout(() => { this.syncStatus = ''; }, 6000);
     },
 
     // ── time helpers ─────────────────────────────────────────
