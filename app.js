@@ -98,6 +98,7 @@ const i18n = {
     hostingStep5: '5. Link: https://seuusuario.github.io/horas',
     hostingStep6: '6. Compartilhe com seus colegas',
     closeModal: 'Fechar',
+    showTotals: 'Incluir totais de horas no relatório',
   },
   en: {
     appTitle: 'Work Hours Tracker',
@@ -179,6 +180,7 @@ const i18n = {
     hostingStep5: '5. Link: https://yourusername.github.io/horas',
     hostingStep6: '6. Share the link with your coworkers',
     closeModal: 'Close',
+    showTotals: 'Include hour totals in report',
   }
 };
 
@@ -197,7 +199,7 @@ function app() {
     formError: '',
     newCompanyName: '',
     companyError: '',
-    report: { dateFrom: '', dateTo: '', selectedCompanies: [] },
+    report: { dateFrom: '', dateTo: '', selectedCompanies: [], showTotals: true },
     reportData: [],
     reportTotals: { total: 0, overtime: 0 },
     reportGenerated: false,
@@ -662,28 +664,39 @@ function app() {
     exportPDF() {
       if (!window.jspdf) { alert('jsPDF not loaded yet.'); return; }
       const {jsPDF} = window.jspdf;
+      const showTotals = this.report.showTotals;
       const doc = new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
       doc.setFontSize(14);
       doc.text(this.t('appTitle'), 14, 14);
       doc.setFontSize(9);
       doc.text(`${this.t('period')}: ${this.report.dateFrom||'—'} → ${this.report.dateTo||'—'}`, 14, 20);
       let y=28;
-      const head=[[this.t('date'),this.t('entryTime'),this.t('lunchOut'),this.t('lunchReturn'),this.t('exitTime'),this.t('dayTotal'),this.t('weekSubtotal'),'OT']];
+      const head = showTotals
+        ? [[this.t('date'),this.t('entryTime'),this.t('lunchOut'),this.t('lunchReturn'),this.t('exitTime'),this.t('dayTotal'),this.t('weekSubtotal'),'OT']]
+        : [[this.t('date'),this.t('entryTime'),this.t('lunchOut'),this.t('lunchReturn'),this.t('exitTime')]];
       for (const sec of this.reportData) {
         if (y>170) {doc.addPage(); y=14;}
         doc.setFontSize(11); doc.setFont(undefined,'bold');
         doc.text(sec.companyName,14,y);
         doc.setFont(undefined,'normal'); y+=5;
-        const body=sec.rows.map(r=>[r.date,r.entryTime,r.lunchOut,r.lunchReturn,r.exitTime,r.dayTotal,r.weekTotal,r.ot]);
-        body.push([this.t('companyTotal'),'','','','',this.fmt(sec.totalMinutes),'',sec.overtimeMinutes>0?this.fmt(sec.overtimeMinutes):'']);
+        const rows = showTotals ? sec.rows : sec.rows.filter(r=>r.type==='entry');
+        const body = rows.map(r => showTotals
+          ? [r.date,r.entryTime,r.lunchOut,r.lunchReturn,r.exitTime,r.dayTotal,r.weekTotal,r.ot]
+          : [r.date,r.entryTime,r.lunchOut,r.lunchReturn,r.exitTime]
+        );
+        if (showTotals) body.push([this.t('companyTotal'),'','','','',this.fmt(sec.totalMinutes),'',sec.overtimeMinutes>0?this.fmt(sec.overtimeMinutes):'']);
         doc.autoTable({startY:y,head,body,styles:{fontSize:7.5,cellPadding:1.5},headStyles:{fillColor:[26,54,93]},margin:{left:14,right:14}});
         y=doc.lastAutoTable.finalY+5;
-        doc.setFontSize(8);
-        for (const ft of sec.fortnights) { doc.text(`${ft.label}: ${this.fmt(ft.mins)}`,14,y); y+=4; }
+        if (showTotals) {
+          doc.setFontSize(8);
+          for (const ft of sec.fortnights) { doc.text(`${ft.label}: ${this.fmt(ft.mins)}`,14,y); y+=4; }
+        }
         y+=4;
       }
-      doc.setFontSize(10); doc.setFont(undefined,'bold');
-      doc.text(`${this.t('totalFiltered')}: ${this.fmt(this.reportTotals.total)}   ${this.t('overtime')}: ${this.fmt(this.reportTotals.overtime)}`,14,y+4);
+      if (showTotals) {
+        doc.setFontSize(10); doc.setFont(undefined,'bold');
+        doc.text(`${this.t('totalFiltered')}: ${this.fmt(this.reportTotals.total)}   ${this.t('overtime')}: ${this.fmt(this.reportTotals.overtime)}`,14,y+4);
+      }
       doc.save(`horas-${todayStr()}.pdf`);
     },
 
@@ -691,13 +704,25 @@ function app() {
 
     exportXLSX() {
       if (!window.XLSX) { alert('SheetJS not loaded yet.'); return; }
+      const showTotals = this.report.showTotals;
       const wb = XLSX.utils.book_new();
       for (const sec of this.reportData) {
-        const aoa=[[this.t('date'),this.t('entryTime'),this.t('lunchOut'),this.t('lunchReturn'),this.t('exitTime'),this.t('dayTotal'),this.t('weekSubtotal'),'OT']];
-        for (const r of sec.rows) aoa.push([r.date,r.entryTime,r.lunchOut,r.lunchReturn,r.exitTime,r.dayTotal,r.weekTotal,r.ot]);
-        aoa.push([this.t('companyTotal'),'','','','',this.fmt(sec.totalMinutes),'',sec.overtimeMinutes>0?this.fmt(sec.overtimeMinutes):'']);
-        aoa.push([]);
-        for (const ft of sec.fortnights) aoa.push([ft.label,this.fmt(ft.mins)]);
+        const headers = showTotals
+          ? [this.t('date'),this.t('entryTime'),this.t('lunchOut'),this.t('lunchReturn'),this.t('exitTime'),this.t('dayTotal'),this.t('weekSubtotal'),'OT']
+          : [this.t('date'),this.t('entryTime'),this.t('lunchOut'),this.t('lunchReturn'),this.t('exitTime')];
+        const aoa = [headers];
+        const rows = showTotals ? sec.rows : sec.rows.filter(r=>r.type==='entry');
+        for (const r of rows) {
+          aoa.push(showTotals
+            ? [r.date,r.entryTime,r.lunchOut,r.lunchReturn,r.exitTime,r.dayTotal,r.weekTotal,r.ot]
+            : [r.date,r.entryTime,r.lunchOut,r.lunchReturn,r.exitTime]
+          );
+        }
+        if (showTotals) {
+          aoa.push([this.t('companyTotal'),'','','','',this.fmt(sec.totalMinutes),'',sec.overtimeMinutes>0?this.fmt(sec.overtimeMinutes):'']);
+          aoa.push([]);
+          for (const ft of sec.fortnights) aoa.push([ft.label,this.fmt(ft.mins)]);
+        }
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), sec.companyName.slice(0,31));
       }
       XLSX.writeFile(wb, `horas-${todayStr()}.xlsx`);

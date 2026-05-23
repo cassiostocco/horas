@@ -231,6 +231,12 @@
           <input type="date" x-model="report.dateTo">
         </div>
         <div class="field field-full">
+          <label class="checkbox-row">
+            <input type="checkbox" x-model="report.showTotals">
+            <span x-text="t('showTotals')"></span>
+          </label>
+        </div>
+        <div class="field field-full">
           <label class="field-label" x-text="t('companies')"></label>
           <div class="company-checks">
             <label class="check-chip">
@@ -262,7 +268,7 @@
     </div>
 
     <div x-show="reportGenerated">
-      <div class="card">
+      <div class="card" x-show="report.showTotals">
         <div class="summary-strip">
           <div class="sbox">
             <div class="sbox-label" x-text="t('totalFiltered')"></div>
@@ -292,26 +298,27 @@
                   <th x-text="t('lunchOut')"></th>
                   <th x-text="t('lunchReturn')"></th>
                   <th x-text="t('exitTime')"></th>
-                  <th x-text="t('dayTotal')"></th>
-                  <th x-text="t('weekSubtotal')"></th>
-                  <th>OT</th>
+                  <th x-show="report.showTotals" x-text="t('dayTotal')"></th>
+                  <th x-show="report.showTotals" x-text="t('weekSubtotal')"></th>
+                  <th x-show="report.showTotals">OT</th>
                 </tr>
               </thead>
               <tbody>
                 <template x-for="row in sec.rows" :key="row.id">
-                  <tr :class="{'week-sub': row.type==='week-sub'}">
+                  <tr :class="{'week-sub': row.type==='week-sub'}"
+                      x-show="row.type!=='week-sub' || report.showTotals">
                     <td x-text="row.date"></td>
                     <td x-text="row.entryTime"></td>
                     <td x-text="row.lunchOut"></td>
                     <td x-text="row.lunchReturn"></td>
                     <td x-text="row.exitTime"></td>
-                    <td x-text="row.dayTotal"></td>
-                    <td x-text="row.weekTotal"></td>
-                    <td x-text="row.ot"></td>
+                    <td x-show="report.showTotals" x-text="row.dayTotal"></td>
+                    <td x-show="report.showTotals" x-text="row.weekTotal"></td>
+                    <td x-show="report.showTotals" x-text="row.ot"></td>
                   </tr>
                 </template>
               </tbody>
-              <tfoot>
+              <tfoot x-show="report.showTotals">
                 <tr>
                   <td colspan="5" x-text="t('companyTotal')"></td>
                   <td x-text="fmt(sec.totalMinutes)"></td>
@@ -321,7 +328,7 @@
               </tfoot>
             </table>
           </div>
-          <div class="fortnight-summary" x-show="sec.fortnights.length>0">
+          <div class="fortnight-summary" x-show="sec.fortnights.length>0 && report.showTotals">
             <template x-for="ft in sec.fortnights" :key="ft.label">
               <span class="ft-chip" x-text="ft.label + ': ' + fmt(ft.mins)"></span>
             </template>
