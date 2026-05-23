@@ -246,7 +246,8 @@ function app() {
     },
 
     showSettings: false,
-    syncStatus: '', // '' | 'syncing' | 'done' | 'error'
+    syncStatus: '', // '' | 'syncing' | 'done' | 'error' | 'restored' | 'empty'
+    _syncTimer: null,
 
     // ── lifecycle ────────────────────────────────────────────
 
@@ -270,6 +271,8 @@ function app() {
           localStorage.setItem('horas_user', JSON.stringify(this.gauth.user));
           this.loadUserData();
           this.gauth.unlocked = true;
+          // Try to get Sheets token silently, then auto-sync
+          this.tryGetSheetsToken().then(ok => { if (ok) this.syncOnSignIn(); });
         } catch (_) {
           this.gauth.error = this.t('signInError');
         }
@@ -300,10 +303,12 @@ function app() {
           const d = JSON.parse(raw);
           this.companies = d.companies || [];
           this.entries = d.entries || [];
+          this._localModified = d.lastModified || 0;
         } catch (_) {}
       } else {
         this.companies = [];
         this.entries = [];
+        this._localModified = 0;
       }
 
       this.form.date = todayStr();
@@ -313,10 +318,24 @@ function app() {
     persist() {
       if (!this.gauth.user) return;
       const key = 'horas_v1_' + this.gauth.user.email;
+      this._localModified = Date.now();
       localStorage.setItem(key, JSON.stringify({
         companies: this.companies,
-        entries: this.entries
+        entries: this.entries,
+        lastModified: this._localModified
       }));
+      this.scheduleAutoSync();
+    },
+
+    scheduleAutoSync() {
+      clearTimeout(this._syncTimer);
+      this._syncTimer = setTimeout(() => this.autoSync(), 3000);
+    },
+
+    async autoSync() {
+      const hasToken = this.gauth.accessToken && Date.now() < this.gauth.tokenExpiry;
+      if (!hasToken || this.syncStatus === 'syncing') return;
+      await this.syncToSheets(true);
     },
 
     // ── i18n ────────────────────────────────────────────────
@@ -358,6 +377,59 @@ function app() {
       localStorage.removeItem('horas_user');
       this.companies = [];
       this.entries = [];
+    },
+
+    // ── silent Sheets token (no popup) ──────────────────────
+
+    async tryGetSheetsToken() {
+      if (!tokenClient) return false;
+      if (this.gauth.accessToken && Date.now() < this.gauth.tokenExpiry) return true;
+      return new Promise((resolve) => {
+        tokenClient.callback = (resp) => {
+          if (resp.error) { resolve(false); return; }
+          this.gauth.accessToken = resp.access_token;
+          this.gauth.tokenExpiry = Date.now() + (resp.expires_in - 60) * 1000;
+          resolve(true);
+        };
+        tokenClient.requestAccessToken({ prompt: '' });
+      });
+    },
+
+    // Called after sign-in + token acquired: restore if Sheets is newer, push if local is newer
+    async syncOnSignIn() {
+      try {
+        const sheetId = await this.findOrCreateSpreadsheet();
+        const res = await fetch(
+          `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Config!A1`,
+          { headers: { Authorization: `Bearer ${this.gauth.accessToken}` } }
+        );
+        if (!res.ok) {
+          if (this.entries.length > 0) await this.syncToSheets(true);
+          return;
+        }
+        const data = await res.json();
+        const jsonStr = data.values?.[0]?.[0];
+        if (!jsonStr) {
+          if (this.entries.length > 0) await this.syncToSheets(true);
+          return;
+        }
+        const sheetsData = JSON.parse(jsonStr);
+        const sheetsModified = sheetsData.lastModified || 0;
+        if (sheetsModified > (this._localModified || 0)) {
+          // Sheets is newer — restore silently
+          this.companies = sheetsData.companies || [];
+          this.entries = sheetsData.entries || [];
+          this._localModified = sheetsModified;
+          const key = 'horas_v1_' + this.gauth.user.email;
+          localStorage.setItem(key, JSON.stringify({
+            companies: this.companies, entries: this.entries, lastModified: sheetsModified
+          }));
+          this.report.selectedCompanies = this.companies.map(c => c.id);
+        } else {
+          // Local is newer (or same) — push to Sheets silently
+          await this.syncToSheets(true);
+        }
+      } catch (_) {}
     },
 
     // ── token refresh ────────────────────────────────────────
@@ -430,8 +502,8 @@ function app() {
       return sheetId;
     },
 
-    async syncToSheets() {
-      this.syncStatus = 'syncing';
+    async syncToSheets(silent = false) {
+      if (!silent) this.syncStatus = 'syncing';
       try {
         const ok = await this.ensureToken();
         if (!ok) { this.syncStatus = 'error'; return; }
@@ -496,11 +568,11 @@ function app() {
           });
         }
 
-        this.syncStatus = 'done';
+        if (!silent) this.syncStatus = 'done';
       } catch (_) {
-        this.syncStatus = 'error';
+        if (!silent) this.syncStatus = 'error';
       }
-      setTimeout(() => { this.syncStatus = ''; }, 5000);
+      if (!silent) setTimeout(() => { this.syncStatus = ''; }, 5000);
     },
 
     async restoreFromSheets() {

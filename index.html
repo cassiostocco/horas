@@ -93,6 +93,7 @@
         <img class="user-avatar" :src="gauth.user?.picture" :alt="gauth.user?.name">
         <span class="user-name" x-text="gauth.user?.name?.split(' ')[0]"></span>
       </div>
+      <span class="sync-dot" x-show="syncStatus==='syncing'" title="Sincronizando...">↻</span>
       <button class="icon-btn icon-btn-danger" @click="signOut()" :title="t('logout')">⏻</button>
     </div>
   </div>
