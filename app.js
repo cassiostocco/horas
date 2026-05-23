@@ -462,7 +462,7 @@ function app() {
     fmtDate(s) {
       if (!s) return '';
       const [y,mo,d] = s.split('-');
-      return `${d}/${mo}/${y}`;
+      return this.lang === 'en' ? `${mo}/${d}/${y}` : `${d}/${mo}/${y}`;
     },
 
     fmtDateWithDay(s) {
@@ -669,7 +669,7 @@ function app() {
       doc.setFontSize(14);
       doc.text(this.t('appTitle'), 14, 14);
       doc.setFontSize(9);
-      doc.text(`${this.t('period')}: ${this.report.dateFrom||'—'} → ${this.report.dateTo||'—'}`, 14, 20);
+      doc.text(`${this.t('period')}: ${this.fmtDate(this.report.dateFrom)||'—'} → ${this.fmtDate(this.report.dateTo)||'—'}`, 14, 20);
       let y=28;
       const head = showTotals
         ? [[this.t('date'),this.t('entryTime'),this.t('lunchOut'),this.t('lunchReturn'),this.t('exitTime'),this.t('dayTotal'),this.t('weekSubtotal'),'OT']]
