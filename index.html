@@ -141,6 +141,7 @@
       <h2 x-text="editingId ? t('editEntry') : t('newEntry')"></h2>
       <div class="info-msg" x-show="companies.length===0" x-text="t('noCompanyForEntry')"></div>
       <div x-show="companies.length>0">
+        <button class="btn-fill-defaults" x-show="!editingId" @click="applyDefaults()" x-text="t('fillDefaults')"></button>
         <div class="form-grid">
           <div class="field">
             <label class="field-label" x-text="t('company')"></label>
@@ -250,6 +251,44 @@
           </li>
         </template>
       </ul>
+    </div>
+
+    <!-- Default schedule editor -->
+    <div class="card">
+      <h2 x-text="t('defaultSchedule')"></h2>
+      <p class="field-hint" x-text="t('defaultScheduleHint')"></p>
+      <div class="form-grid">
+        <div class="field">
+          <label class="field-label" x-text="t('entryTime')"></label>
+          <input type="text" inputmode="numeric" placeholder="HH:MM"
+            x-model="defaults.entryTime" @blur="defaults.entryTime = parseTime(defaults.entryTime)">
+        </div>
+        <div class="field">
+          <label class="field-label" x-text="t('exitTime')"></label>
+          <input type="text" inputmode="numeric" placeholder="HH:MM"
+            x-model="defaults.exitTime" @blur="defaults.exitTime = parseTime(defaults.exitTime)">
+        </div>
+        <div class="field field-full">
+          <label class="checkbox-row">
+            <input type="checkbox" x-model="defaults.noLunch">
+            <span x-text="t('noLunch')"></span>
+          </label>
+        </div>
+        <div class="field" x-show="!defaults.noLunch">
+          <label class="field-label" x-text="t('lunchOut')"></label>
+          <input type="text" inputmode="numeric" placeholder="HH:MM"
+            x-model="defaults.lunchOut" @blur="defaults.lunchOut = parseTime(defaults.lunchOut)">
+        </div>
+        <div class="field" x-show="!defaults.noLunch">
+          <label class="field-label" x-text="t('lunchReturn')"></label>
+          <input type="text" inputmode="numeric" placeholder="HH:MM"
+            x-model="defaults.lunchReturn" @blur="defaults.lunchReturn = parseTime(defaults.lunchReturn)">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-primary" @click="saveDefaults()" x-text="t('saveDefaults')"></button>
+        <span class="defaults-saved-msg" x-show="defaultsSaved" x-text="t('defaultsSavedMsg')"></span>
+      </div>
     </div>
   </div>
 

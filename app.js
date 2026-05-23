@@ -124,6 +124,11 @@ const i18n = {
     errorInvalidTime: 'Horário inválido. Digite no formato HH:MM (ex: 08:30).',
     syncAuthBanner: '⚠️ Sincronização não autorizada. Toque no botão abaixo para buscar seus dados do Google Sheets e ativar o sync automático.',
     syncAuthBtn: '🔄 Buscar meus dados / Ativar sincronização',
+    defaultSchedule: 'Horário Padrão',
+    defaultScheduleHint: 'Define os horários preenchidos automaticamente no formulário.',
+    fillDefaults: '⚡ Horário padrão',
+    saveDefaults: 'Salvar padrão',
+    defaultsSavedMsg: 'Padrão salvo!',
   },
   en: {
     appTitle: 'Work Hours Tracker',
@@ -215,6 +220,11 @@ const i18n = {
     errorInvalidTime: 'Invalid time. Use HH:MM format (e.g. 08:30).',
     syncAuthBanner: '⚠️ Sync not authorized. Tap below to fetch your data from Google Sheets and enable automatic sync.',
     syncAuthBtn: '🔄 Fetch my data / Enable sync',
+    defaultSchedule: 'Default Schedule',
+    defaultScheduleHint: 'Sets the times auto-filled in the entry form.',
+    fillDefaults: '⚡ Default schedule',
+    saveDefaults: 'Save defaults',
+    defaultsSavedMsg: 'Defaults saved!',
   }
 };
 
@@ -233,6 +243,8 @@ function app() {
     formError: '',
     newCompanyName: '',
     companyError: '',
+    defaults: { entryTime: '08:00', lunchOut: '12:30', lunchReturn: '13:00', exitTime: '17:00', noLunch: false },
+    defaultsSaved: false,
     report: { dateFrom: '', dateTo: '', selectedCompanies: [], showTotals: true },
     reportData: [],
     reportTotals: { total: 0, overtime: 0 },
@@ -322,6 +334,7 @@ function app() {
           this.companies = d.companies || [];
           this.entries = d.entries || [];
           this._localModified = d.lastModified || 0;
+          if (d.defaults) this.defaults = d.defaults;
         } catch (_) {}
       } else {
         this.companies = [];
@@ -340,6 +353,7 @@ function app() {
       localStorage.setItem(key, JSON.stringify({
         companies: this.companies,
         entries: this.entries,
+        defaults: this.defaults,
         lastModified: this._localModified
       }));
       this.scheduleAutoSync();
@@ -445,10 +459,11 @@ function app() {
         if (sheetsModified > localModified || (sheetsEntries.length > 0 && this.entries.length === 0)) {
           this.companies = sheetsData.companies || [];
           this.entries = sheetsEntries;
+          if (sheetsData.defaults) this.defaults = sheetsData.defaults;
           this._localModified = sheetsModified;
           const key = 'horas_v1_' + this.gauth.user.email;
           localStorage.setItem(key, JSON.stringify({
-            companies: this.companies, entries: this.entries, lastModified: sheetsModified
+            companies: this.companies, entries: this.entries, defaults: this.defaults, lastModified: sheetsModified
           }));
           this.report.selectedCompanies = this.companies.map(c => c.id);
         } else if (this.entries.length > 0) {
@@ -582,7 +597,7 @@ function app() {
         });
 
         // Write full JSON to Config sheet for cross-device restore
-        const jsonBackup = JSON.stringify({ companies: this.companies, entries: this.entries, lastModified: this._localModified });
+        const jsonBackup = JSON.stringify({ companies: this.companies, entries: this.entries, defaults: this.defaults, lastModified: this._localModified });
         const configRes = await fetch(`${base}/values/Config!A1?valueInputOption=RAW`, {
           method: 'PUT',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -632,6 +647,7 @@ function app() {
         const parsed = JSON.parse(jsonStr);
         this.companies = parsed.companies || [];
         this.entries = parsed.entries || [];
+        if (parsed.defaults) this.defaults = parsed.defaults;
         this.persist();
         this.report.selectedCompanies = this.companies.map(c => c.id);
         this.syncStatus = 'restored';
@@ -833,6 +849,20 @@ function app() {
     },
 
     cancelEdit() { this.editingId=null; this.resetForm(); },
+
+    applyDefaults() {
+      this.form.entryTime  = this.defaults.entryTime;
+      this.form.lunchOut   = this.defaults.lunchOut;
+      this.form.lunchReturn = this.defaults.lunchReturn;
+      this.form.exitTime   = this.defaults.exitTime;
+      this.form.noLunch    = this.defaults.noLunch;
+    },
+
+    saveDefaults() {
+      this.persist();
+      this.defaultsSaved = true;
+      setTimeout(() => { this.defaultsSaved = false; }, 2500);
+    },
 
     resetForm() {
       this.form = {
