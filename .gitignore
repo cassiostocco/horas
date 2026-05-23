@@ -1,0 +1,7 @@
+node_modules/
+*.mjs
+*.png
+package.json
+package-lock.json
+CLAUDE.md
+resumo.md
