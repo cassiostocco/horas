@@ -100,15 +100,14 @@ body {
 
 /* ── Sync auth banner ── */
 .sync-auth-banner {
-  display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
-  background: #fffbeb; border: 1px solid #f6ad55; border-radius: 10px;
-  padding: .75rem 1rem; margin-bottom: 1rem; font-size: .875rem; color: #744210;
+  display: flex; flex-direction: column; gap: .6rem;
+  background: #fffbeb; border: 2px solid #ed8936; border-radius: 10px;
+  padding: 1rem; margin-bottom: 1rem; font-size: .9rem; color: #744210; font-weight: 500;
 }
-.sync-auth-banner span { flex: 1; }
 .btn-sync-auth {
-  background: #ed8936; color: #fff; border: none; border-radius: 7px;
-  padding: .45rem 1rem; font-size: .85rem; font-weight: 600; cursor: pointer;
-  white-space: nowrap;
+  background: #ed8936; color: #fff; border: none; border-radius: 8px;
+  padding: .7rem 1rem; font-size: .95rem; font-weight: 700; cursor: pointer;
+  width: 100%; text-align: center;
 }
 .btn-sync-auth:active { opacity: .85; }
 

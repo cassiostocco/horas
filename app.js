@@ -122,8 +122,8 @@ const i18n = {
     weekOverview: 'Resumo da semana',
     today: 'Hoje',
     errorInvalidTime: 'Horário inválido. Digite no formato HH:MM (ex: 08:30).',
-    syncAuthBanner: 'Toque aqui para ativar a sincronização automática entre dispositivos.',
-    syncAuthBtn: 'Ativar sincronização',
+    syncAuthBanner: '⚠️ Sincronização não autorizada. Toque no botão abaixo para buscar seus dados do Google Sheets e ativar o sync automático.',
+    syncAuthBtn: '🔄 Buscar meus dados / Ativar sincronização',
   },
   en: {
     appTitle: 'Work Hours Tracker',
@@ -213,8 +213,8 @@ const i18n = {
     weekOverview: 'Week overview',
     today: 'Today',
     errorInvalidTime: 'Invalid time. Use HH:MM format (e.g. 08:30).',
-    syncAuthBanner: 'Tap here to enable automatic sync across devices.',
-    syncAuthBtn: 'Enable sync',
+    syncAuthBanner: '⚠️ Sync not authorized. Tap below to fetch your data from Google Sheets and enable automatic sync.',
+    syncAuthBtn: '🔄 Fetch my data / Enable sync',
   }
 };
 
@@ -422,19 +422,22 @@ function app() {
           return;
         }
         const sheetsData = JSON.parse(jsonStr);
+        const sheetsEntries = sheetsData.entries || [];
         const sheetsModified = sheetsData.lastModified || 0;
-        if (sheetsModified > (this._localModified || 0)) {
-          // Sheets is newer — restore silently
+        const localModified = this._localModified || 0;
+
+        // Restore if: Sheets is newer, OR local is empty but Sheets has data
+        if (sheetsModified > localModified || (sheetsEntries.length > 0 && this.entries.length === 0)) {
           this.companies = sheetsData.companies || [];
-          this.entries = sheetsData.entries || [];
+          this.entries = sheetsEntries;
           this._localModified = sheetsModified;
           const key = 'horas_v1_' + this.gauth.user.email;
           localStorage.setItem(key, JSON.stringify({
             companies: this.companies, entries: this.entries, lastModified: sheetsModified
           }));
           this.report.selectedCompanies = this.companies.map(c => c.id);
-        } else {
-          // Local is newer (or same) — push to Sheets silently
+        } else if (this.entries.length > 0) {
+          // Local has data and is not older — push to Sheets
           await this.syncToSheets(true);
         }
       } catch (_) {}
@@ -564,7 +567,7 @@ function app() {
         });
 
         // Write full JSON to Config sheet for cross-device restore
-        const jsonBackup = JSON.stringify({ companies: this.companies, entries: this.entries });
+        const jsonBackup = JSON.stringify({ companies: this.companies, entries: this.entries, lastModified: this._localModified });
         const configRes = await fetch(`${base}/values/Config!A1?valueInputOption=RAW`, {
           method: 'PUT',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
