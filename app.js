@@ -715,30 +715,6 @@ function app() {
       return mon.toISOString().slice(0,10);
     },
 
-    fortnightId(dateStr) {
-      const [y,mo,d] = dateStr.split('-').map(Number);
-      const anchorUtc = Date.UTC(2026, 4, 4); // May 4, 2026 — known pay period start (Mon)
-      const dateUtc = Date.UTC(y, mo-1, d);
-      const diffDays = Math.floor((dateUtc - anchorUtc) / 86400000);
-      const periodStartMs = anchorUtc + Math.floor(diffDays / 14) * 14 * 86400000;
-      const s = new Date(periodStartMs);
-      return `${s.getUTCFullYear()}-${String(s.getUTCMonth()+1).padStart(2,'0')}-${String(s.getUTCDate()).padStart(2,'0')}`;
-    },
-
-    fortnightLabel(fid) {
-      const [y,mo,d] = fid.split('-').map(Number);
-      const startUtc = Date.UTC(y, mo-1, d);
-      const endUtc = startUtc + 13 * 86400000;
-      const fmt = utc => {
-        const dt = new Date(utc);
-        const dd = String(dt.getUTCDate()).padStart(2,'0');
-        const mm = String(dt.getUTCMonth()+1).padStart(2,'0');
-        const yyyy = dt.getUTCFullYear();
-        return this.lang === 'en' ? `${mm}/${dd}/${yyyy}` : `${dd}/${mm}/${yyyy}`;
-      };
-      return `${fmt(startUtc)} – ${fmt(endUtc)}`;
-    },
-
     // ── time input helpers ───────────────────────────────────
 
     parseTime(val) {
@@ -950,12 +926,6 @@ function app() {
           const wk = this.weekStart(e.date);
           (byWeek[wk]=byWeek[wk]||[]).push({...e, mins:this.calcMinutes(e)});
         }
-        const byFortnight = {};
-        for (const e of ces) {
-          const fid = this.fortnightId(e.date);
-          byFortnight[fid] = (byFortnight[fid]||0) + this.calcMinutes(e);
-        }
-
         const rows = [];
         let companyTotal=0;
 
@@ -983,13 +953,9 @@ function app() {
           });
         }
 
-        const fortnights = Object.entries(byFortnight)
-          .sort((a,b)=>a[0].localeCompare(b[0]))
-          .map(([fid,mins])=>({label:this.fortnightLabel(fid),mins}));
-
         this.reportData.push({
           companyId, companyName:this.cname(companyId),
-          rows, totalMinutes:companyTotal, fortnights
+          rows, totalMinutes:companyTotal
         });
         grandTotal+=companyTotal;
       }
@@ -1035,10 +1001,6 @@ function app() {
         if (showTotals) body.push([this.t('companyTotal'),'','','','',this.fmt(sec.totalMinutes),'','']);
         doc.autoTable({startY:y,head,body,styles:tableStyles,headStyles:{fillColor:[26,54,93]},columnStyles:colStyles,tableWidth:tableW,margin:{left:marginLeft,right:14}});
         y=doc.lastAutoTable.finalY+5;
-        if (showTotals) {
-          doc.setFontSize(8);
-          for (const ft of sec.fortnights) { doc.text(`${ft.label}: ${this.fmt(ft.mins)}`,marginLeft,y); y+=4; }
-        }
         y+=4;
       }
       if (showTotals) {
@@ -1068,8 +1030,6 @@ function app() {
         }
         if (showTotals) {
           aoa.push([this.t('companyTotal'),'','','','',this.fmt(sec.totalMinutes),'','']);
-          aoa.push([]);
-          for (const ft of sec.fortnights) aoa.push([ft.label,this.fmt(ft.mins)]);
         }
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), sec.companyName.slice(0,31));
       }

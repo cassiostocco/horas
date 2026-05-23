@@ -410,11 +410,6 @@
               </tfoot>
             </table>
           </div>
-          <div class="fortnight-summary" x-show="sec.fortnights.length>0 && report.showTotals">
-            <template x-for="ft in sec.fortnights" :key="ft.label">
-              <span class="ft-chip" x-text="ft.label + ': ' + fmt(ft.mins)"></span>
-            </template>
-          </div>
         </div>
       </template>
     </div>
