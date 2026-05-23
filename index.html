@@ -47,6 +47,8 @@
           <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="google-icon" alt="">
           <span x-text="t('signInBtn')"></span>
         </button>
+        <!-- Fallback: rendered by Google SDK if One Tap can't display -->
+        <div id="g-signin-fallback" style="display:none;justify-content:center;margin-top:.75rem"></div>
       </div>
 
       <p class="auth-error" x-show="gauth.error" x-text="gauth.error"></p>

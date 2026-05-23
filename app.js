@@ -1,21 +1,35 @@
 const CLIENT_ID = '750076288563-59u39gs5eiucjt6kdcjvfne0h8i90bf9.apps.googleusercontent.com';
 
 let tokenClient = null;
-let _gauthCallback = null; // queued when Alpine init() runs before GIS loads
 
 // Called by Google Identity Services script onload
 function initGoogleSignIn() {
+  // Identity sign-in — uses FedCM or One Tap overlay, never a popup
+  google.accounts.id.initialize({
+    client_id: CLIENT_ID,
+    callback: (credentialResponse) => {
+      if (window._handleGoogleCredential) window._handleGoogleCredential(credentialResponse);
+    },
+    auto_select: true,
+    cancel_on_tap_outside: false,
+  });
+
+  // Token client — only for Sheets/Drive, requested on user action (no popup block risk)
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: [
-      'https://www.googleapis.com/auth/userinfo.email',
-      'https://www.googleapis.com/auth/userinfo.profile',
       'https://www.googleapis.com/auth/spreadsheets',
       'https://www.googleapis.com/auth/drive.file'
     ].join(' '),
-    callback: '' // set per-request
+    callback: ''
   });
-  if (_gauthCallback) { _gauthCallback(); _gauthCallback = null; }
+
+  // Attempt silent auto sign-in on page load
+  google.accounts.id.prompt((notification) => {
+    if ((notification.isNotDisplayed() || notification.isSkippedMoment()) && window._gauthLoadingDone) {
+      window._gauthLoadingDone();
+    }
+  });
 }
 
 // ── i18n ──────────────────────────────────────────────────────
@@ -233,15 +247,29 @@ function app() {
 
       try {
         const saved = localStorage.getItem('horas_user');
-        if (saved) this.gauth.user = JSON.parse(saved);
+        if (saved) {
+          this.gauth.user = JSON.parse(saved);
+          this.gauth.loading = true; // show spinner while auto sign-in runs
+        }
       } catch (_) {}
 
-      // Attempt silent sign-in if user was here before
-      if (this.gauth.user) {
-        const doSilent = () => this.signInSilent();
-        if (tokenClient) doSilent();
-        else _gauthCallback = doSilent;
-      }
+      // Receives credential from google.accounts.id (FedCM / One Tap)
+      window._handleGoogleCredential = (credResponse) => {
+        try {
+          const [, b64] = credResponse.credential.split('.');
+          const payload = JSON.parse(atob(b64.replace(/-/g, '+').replace(/_/g, '/')));
+          this.gauth.user = { email: payload.email, name: payload.name, picture: payload.picture };
+          localStorage.setItem('horas_user', JSON.stringify(this.gauth.user));
+          this.loadUserData();
+          this.gauth.unlocked = true;
+        } catch (_) {
+          this.gauth.error = this.t('signInError');
+        }
+        this.gauth.loading = false;
+      };
+
+      // Called when auto sign-in can't run silently — let user click manually
+      window._gauthLoadingDone = () => { this.gauth.loading = false; };
     },
 
     loadUserData() {
@@ -295,57 +323,26 @@ function app() {
     // ── Google auth ──────────────────────────────────────────
 
     signIn() {
-      if (!tokenClient) { this.gauth.error = this.t('signInError'); return; }
+      if (!window.google?.accounts?.id) { this.gauth.error = this.t('signInError'); return; }
       this.gauth.loading = true;
       this.gauth.error = '';
-
-      tokenClient.callback = async (response) => {
-        if (response.error) {
+      google.accounts.id.prompt((notification) => {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
           this.gauth.loading = false;
-          this.gauth.error = this.t('signInError');
-          return;
+          // One Tap couldn't display — render Google's button as fallback
+          const el = document.getElementById('g-signin-fallback');
+          if (el) {
+            google.accounts.id.renderButton(el, { theme: 'outline', size: 'large', width: 260 });
+            el.style.display = 'flex';
+          }
         }
-
-        this.gauth.accessToken = response.access_token;
-        this.gauth.tokenExpiry = Date.now() + (response.expires_in - 60) * 1000;
-
-        try {
-          const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-            headers: { Authorization: `Bearer ${this.gauth.accessToken}` }
-          });
-          const info = await res.json();
-          this.gauth.user = { email: info.email, name: info.name, picture: info.picture };
-          localStorage.setItem('horas_user', JSON.stringify(this.gauth.user));
-          this.loadUserData();
-          this.gauth.unlocked = true;
-          this.gauth.error = '';
-        } catch (_) {
-          this.gauth.error = this.t('signInError');
-        }
-        this.gauth.loading = false;
-      };
-
-      // returning user: try silent; new user: show consent
-      tokenClient.requestAccessToken({ prompt: this.gauth.user ? '' : 'consent' });
-    },
-
-    signInSilent() {
-      this.gauth.loading = true;
-      tokenClient.callback = async (response) => {
-        if (response.error) { this.gauth.loading = false; return; }
-        this.gauth.accessToken = response.access_token;
-        this.gauth.tokenExpiry = Date.now() + (response.expires_in - 60) * 1000;
-        this.loadUserData();
-        this.gauth.unlocked = true;
-        this.gauth.loading = false;
-      };
-      tokenClient.requestAccessToken({ prompt: '' });
+      });
     },
 
     signOut() {
-      if (this.gauth.accessToken) {
-        google.accounts.oauth2.revoke(this.gauth.accessToken, () => {});
-      }
+      if (this.gauth.accessToken) google.accounts.oauth2.revoke(this.gauth.accessToken, () => {});
+      if (this.gauth.user?.email) google.accounts.id.revoke(this.gauth.user.email, () => {});
+      google.accounts.id.disableAutoSelect();
       this.gauth.unlocked = false;
       this.gauth.accessToken = null;
       this.gauth.user = null;
@@ -359,15 +356,18 @@ function app() {
 
     async ensureToken() {
       if (this.gauth.accessToken && Date.now() < this.gauth.tokenExpiry) return true;
-      return new Promise((resolve) => {
-        tokenClient.callback = (response) => {
-          if (response.error) { resolve(false); return; }
-          this.gauth.accessToken = response.access_token;
-          this.gauth.tokenExpiry = Date.now() + (response.expires_in - 60) * 1000;
+      const ask = (prompt) => new Promise((resolve) => {
+        tokenClient.callback = (resp) => {
+          if (resp.error) { resolve(false); return; }
+          this.gauth.accessToken = resp.access_token;
+          this.gauth.tokenExpiry = Date.now() + (resp.expires_in - 60) * 1000;
           resolve(true);
         };
-        tokenClient.requestAccessToken({ prompt: '' });
+        tokenClient.requestAccessToken({ prompt });
       });
+      // Try silent first; if no prior consent, ask explicitly (popup allowed — triggered by user click)
+      const ok = await ask('');
+      return ok || ask('consent');
     },
 
     // ── Google Sheets sync ───────────────────────────────────
