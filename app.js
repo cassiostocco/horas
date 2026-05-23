@@ -717,13 +717,26 @@ function app() {
 
     fortnightId(dateStr) {
       const [y,mo,d] = dateStr.split('-').map(Number);
-      return `${y}-${String(mo).padStart(2,'0')}-${d<=15?'1':'2'}`;
+      const anchorUtc = Date.UTC(2026, 4, 4); // May 4, 2026 — known pay period start (Mon)
+      const dateUtc = Date.UTC(y, mo-1, d);
+      const diffDays = Math.floor((dateUtc - anchorUtc) / 86400000);
+      const periodStartMs = anchorUtc + Math.floor(diffDays / 14) * 14 * 86400000;
+      const s = new Date(periodStartMs);
+      return `${s.getUTCFullYear()}-${String(s.getUTCMonth()+1).padStart(2,'0')}-${String(s.getUTCDate()).padStart(2,'0')}`;
     },
 
     fortnightLabel(fid) {
-      const [y,mo,half] = fid.split('-');
-      const mn = this.t('monthNames')[parseInt(mo,10)-1];
-      return half==='1' ? `1–15 ${mn} ${y}` : `16–31 ${mn} ${y}`;
+      const [y,mo,d] = fid.split('-').map(Number);
+      const startUtc = Date.UTC(y, mo-1, d);
+      const endUtc = startUtc + 13 * 86400000;
+      const fmt = utc => {
+        const dt = new Date(utc);
+        const dd = String(dt.getUTCDate()).padStart(2,'0');
+        const mm = String(dt.getUTCMonth()+1).padStart(2,'0');
+        const yyyy = dt.getUTCFullYear();
+        return this.lang === 'en' ? `${mm}/${dd}/${yyyy}` : `${dd}/${mm}/${yyyy}`;
+      };
+      return `${fmt(startUtc)} – ${fmt(endUtc)}`;
     },
 
     // ── time input helpers ───────────────────────────────────
