@@ -918,8 +918,17 @@ function app() {
       const byCompany = {};
       for (const e of filtered) (byCompany[e.companyId]=byCompany[e.companyId]||[]).push(e);
 
+      // Overtime is calculated on TOTAL hours across ALL companies per week
+      const globalWeekMins = {};
+      for (const e of filtered) {
+        const wk = this.weekStart(e.date);
+        globalWeekMins[wk] = (globalWeekMins[wk]||0) + this.calcMinutes(e);
+      }
+      const grandOT = Object.values(globalWeekMins)
+        .reduce((sum, m) => sum + Math.max(0, m - 44*60), 0);
+
       this.reportData = [];
-      let grandTotal=0, grandOT=0;
+      let grandTotal=0;
 
       for (const [companyId, ces] of Object.entries(byCompany)) {
         ces.sort((a,b)=>a.date.localeCompare(b.date));
@@ -935,7 +944,7 @@ function app() {
         }
 
         const rows = [];
-        let companyTotal=0, companyOT=0;
+        let companyTotal=0;
 
         for (const wk of Object.keys(byWeek).sort()) {
           let weekTotal=0;
@@ -949,14 +958,15 @@ function app() {
             });
             weekTotal+=e.mins; companyTotal+=e.mins;
           }
-          const ot=Math.max(0,weekTotal-44*60);
-          companyOT+=ot;
+          // Show global week OT only if there's a single company; multi-company OT is at grand total
+          const globalOT = Math.max(0, (globalWeekMins[wk]||0) - 44*60);
+          const showOT = Object.keys(byCompany).length === 1 && globalOT > 0;
           rows.push({
             type:'week-sub', id:'ws-'+wk,
             date:this.t('weekSubtotal')+' ('+this.fmtDate(wk)+')',
             entryTime:'',lunchOut:'',lunchReturn:'',exitTime:'',dayTotal:'',
             weekTotal:this.fmt(weekTotal),
-            ot: ot>0?'+'+this.fmt(ot)+' OT':''
+            ot: showOT ? '+'+this.fmt(globalOT)+' OT' : ''
           });
         }
 
@@ -966,9 +976,9 @@ function app() {
 
         this.reportData.push({
           companyId, companyName:this.cname(companyId),
-          rows, totalMinutes:companyTotal, overtimeMinutes:companyOT, fortnights
+          rows, totalMinutes:companyTotal, fortnights
         });
-        grandTotal+=companyTotal; grandOT+=companyOT;
+        grandTotal+=companyTotal;
       }
 
       this.reportTotals = {total:grandTotal, overtime:grandOT};
@@ -1009,7 +1019,7 @@ function app() {
           ? [r.date,r.entryTime,r.lunchOut,r.lunchReturn,r.exitTime,r.dayTotal,r.weekTotal,r.ot]
           : [r.date,r.entryTime,r.lunchOut,r.lunchReturn,r.exitTime]
         );
-        if (showTotals) body.push([this.t('companyTotal'),'','','','',this.fmt(sec.totalMinutes),'',sec.overtimeMinutes>0?this.fmt(sec.overtimeMinutes):'']);
+        if (showTotals) body.push([this.t('companyTotal'),'','','','',this.fmt(sec.totalMinutes),'','']);
         doc.autoTable({startY:y,head,body,styles:tableStyles,headStyles:{fillColor:[26,54,93]},columnStyles:colStyles,tableWidth:tableW,margin:{left:marginLeft,right:14}});
         y=doc.lastAutoTable.finalY+5;
         if (showTotals) {
@@ -1044,7 +1054,7 @@ function app() {
           );
         }
         if (showTotals) {
-          aoa.push([this.t('companyTotal'),'','','','',this.fmt(sec.totalMinutes),'',sec.overtimeMinutes>0?this.fmt(sec.overtimeMinutes):'']);
+          aoa.push([this.t('companyTotal'),'','','','',this.fmt(sec.totalMinutes),'','']);
           aoa.push([]);
           for (const ft of sec.fortnights) aoa.push([ft.label,this.fmt(ft.mins)]);
         }
