@@ -289,9 +289,10 @@ function app() {
           this.loadUserData();
           this.gauth.unlocked = true;
           // Try to get Sheets token silently, then auto-sync
+          this.syncStatus = 'syncing';
           this.tryGetSheetsToken().then(ok => {
             if (ok) { this.syncOnSignIn(); }
-            else { this.needsSheetsAuth = true; }
+            else { this.syncStatus = ''; this.needsSheetsAuth = true; }
           });
         } catch (_) {
           this.gauth.error = this.t('signInError');
@@ -305,9 +306,10 @@ function app() {
       // When app becomes visible (user returns to tab/PWA), pull fresh data from Sheets
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden && this.gauth.unlocked) {
+          this.syncStatus = 'syncing';
           this.tryGetSheetsToken().then(ok => {
             if (ok) this.syncOnSignIn();
-            else this.needsSheetsAuth = true;
+            else { this.syncStatus = ''; this.needsSheetsAuth = true; }
           });
         }
       });
@@ -369,7 +371,7 @@ function app() {
       const hasToken = this.gauth.accessToken && Date.now() < this.gauth.tokenExpiry;
       if (!hasToken) {
         const ok = await this.tryGetSheetsToken();
-        if (!ok) return;
+        if (!ok) { this.needsSheetsAuth = true; return; }
       }
       await this.syncToSheets(true);
     },
@@ -421,14 +423,18 @@ function app() {
       if (!tokenClient) return false;
       if (this.gauth.accessToken && Date.now() < this.gauth.tokenExpiry) return true;
       return new Promise((resolve) => {
+        let settled = false;
+        const finish = (val) => { if (!settled) { settled = true; resolve(val); } };
         tokenClient.callback = (resp) => {
-          if (resp.error) { resolve(false); return; }
+          if (resp.error) { finish(false); return; }
           this.gauth.accessToken = resp.access_token;
           this.gauth.tokenExpiry = Date.now() + (resp.expires_in - 60) * 1000;
           this.needsSheetsAuth = false;
-          resolve(true);
+          finish(true);
         };
         tokenClient.requestAccessToken({ prompt: '' });
+        // Safety timeout: if callback never fires (PWA/mobile silent grant hangs), resolve after 5s
+        setTimeout(() => finish(false), 5000);
       });
     },
 
@@ -471,6 +477,7 @@ function app() {
           await this.syncToSheets(true);
         }
       } catch (_) {}
+      this.syncStatus = '';
     },
 
     // ── token refresh ────────────────────────────────────────
