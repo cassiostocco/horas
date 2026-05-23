@@ -665,7 +665,7 @@ function app() {
       if (!window.jspdf) { alert('jsPDF not loaded yet.'); return; }
       const {jsPDF} = window.jspdf;
       const showTotals = this.report.showTotals;
-      const doc = new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+      const doc = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
       doc.setFontSize(14);
       doc.text(this.t('appTitle'), 14, 14);
       doc.setFontSize(9);
@@ -674,8 +674,9 @@ function app() {
       const head = showTotals
         ? [[this.t('date'),this.t('entryTime'),this.t('lunchOut'),this.t('lunchReturn'),this.t('exitTime'),this.t('dayTotal'),this.t('weekSubtotal'),'OT']]
         : [[this.t('date'),this.t('entryTime'),this.t('lunchOut'),this.t('lunchReturn'),this.t('exitTime')]];
+      const tableStyles = showTotals ? {fontSize:7,cellPadding:1.2} : {fontSize:8,cellPadding:1.5};
       for (const sec of this.reportData) {
-        if (y>170) {doc.addPage(); y=14;}
+        if (y>255) {doc.addPage(); y=14;}
         doc.setFontSize(11); doc.setFont(undefined,'bold');
         doc.text(sec.companyName,14,y);
         doc.setFont(undefined,'normal'); y+=5;
@@ -685,7 +686,7 @@ function app() {
           : [r.date,r.entryTime,r.lunchOut,r.lunchReturn,r.exitTime]
         );
         if (showTotals) body.push([this.t('companyTotal'),'','','','',this.fmt(sec.totalMinutes),'',sec.overtimeMinutes>0?this.fmt(sec.overtimeMinutes):'']);
-        doc.autoTable({startY:y,head,body,styles:{fontSize:7.5,cellPadding:1.5},headStyles:{fillColor:[26,54,93]},margin:{left:14,right:14}});
+        doc.autoTable({startY:y,head,body,styles:tableStyles,headStyles:{fillColor:[26,54,93]},margin:{left:14,right:14}});
         y=doc.lastAutoTable.finalY+5;
         if (showTotals) {
           doc.setFontSize(8);
