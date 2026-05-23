@@ -1,43 +1,20 @@
-const APPS_SCRIPT_CODE = `function doPost(e) {
-  try {
-    var data = JSON.parse(e.postData.contents);
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    writeEntries(ss, data);
-    writeLog(ss, data);
-    return ContentService
-      .createTextOutput(JSON.stringify({ ok: true, entries: data.entries.length }))
-      .setMimeType(ContentService.MimeType.JSON);
-  } catch(err) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ ok: false, error: String(err) }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-}
+const CLIENT_ID = '750076288563-59u39gs5eiucjt6kdcjvfne0h8i90bf9.apps.googleusercontent.com';
 
-function writeEntries(ss, data) {
-  var sheet = ss.getSheetByName('Lancamentos') || ss.insertSheet('Lancamentos');
-  sheet.clearContents();
-  var companies = {};
-  data.companies.forEach(function(c) { companies[c.id] = c.name; });
-  sheet.appendRow(['Data','Empresa','Entrada','Saida Almoco','Retorno Almoco','Saida','Sem Almoco']);
-  var sorted = data.entries.slice().sort(function(a,b){ return a.date.localeCompare(b.date); });
-  sorted.forEach(function(e) {
-    sheet.appendRow([
-      e.date, companies[e.companyId] || '?',
-      e.entryTime,
-      e.noLunch ? '' : (e.lunchOut || ''),
-      e.noLunch ? '' : (e.lunchReturn || ''),
-      e.exitTime,
-      e.noLunch ? 'Sim' : 'Nao'
-    ]);
+let tokenClient = null;
+
+// Called by Google Identity Services script onload
+function initGoogleSignIn() {
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: [
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/userinfo.profile',
+      'https://www.googleapis.com/auth/spreadsheets',
+      'https://www.googleapis.com/auth/drive.file'
+    ].join(' '),
+    callback: '' // set per-request
   });
 }
-
-function writeLog(ss, data) {
-  var sheet = ss.getSheetByName('Log') || ss.insertSheet('Log');
-  if (sheet.getLastRow() === 0) sheet.appendRow(['Timestamp','Lancamentos','Empresas']);
-  sheet.appendRow([new Date().toLocaleString('pt-BR'), data.entries.length, data.companies.length]);
-}`;
 
 // ── i18n ──────────────────────────────────────────────────────
 const i18n = {
@@ -68,7 +45,6 @@ const i18n = {
     total: 'Total',
     weekOf: 'Semana de',
     weekSubtotal: 'Subtotal semana',
-    fortnightSubtotal: 'Subtotal quinzena',
     actions: 'Ações',
     manageCompanies: 'Gerenciar Empresas',
     companyName: 'Nome da empresa',
@@ -87,63 +63,41 @@ const i18n = {
     overtime: 'Horas extras',
     overtimeNote: '(acima de 44h/semana)',
     companyTotal: 'Total da empresa',
-    noData: 'Nenhum dado encontrado para os filtros selecionados.',
+    noData: 'Nenhum dado encontrado.',
     confirmDelete: 'Excluir este lançamento?',
-    confirmRemoveCompany: 'Remover a empresa? Os lançamentos vinculados serão mantidos.',
+    confirmRemoveCompany: 'Remover empresa? Os lançamentos serão mantidos.',
     errorNoCompany: 'Selecione uma empresa.',
     errorNoDate: 'Informe a data.',
     errorNoTimes: 'Informe entrada e saída.',
     errorCompanyExists: 'Empresa já cadastrada.',
     errorCompanyEmpty: 'Informe o nome da empresa.',
-    errorCompanyHasEntries: 'Não é possível remover: há lançamentos nesta empresa. Exclua-os primeiro.',
+    errorCompanyHasEntries: 'Não é possível remover: há lançamentos nesta empresa.',
     period: 'Período',
-    fortnightLabel: 'quinzena',
     monthNames: ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'],
-    regularHours: 'Horas normais',
-    otHours: 'Horas extras',
     noCompanyForEntry: 'Cadastre ao menos uma empresa antes de lançar horas.',
     weekdayNames: ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'],
     // auth
-    authSetTitle: 'Criar Senha de Acesso',
-    authSetSubtitle: 'Defina uma senha para proteger seus dados.',
-    authEnterTitle: 'Acesso Restrito',
-    authEnterSubtitle: 'Digite sua senha para continuar.',
-    password: 'Senha',
-    newPassword: 'Nova senha',
-    confirmPassword: 'Confirmar senha',
-    unlock: 'Entrar',
-    createPwd: 'Criar Senha',
-    passwordRequired: 'Informe a senha.',
-    passwordMismatch: 'As senhas não coincidem.',
-    passwordWrong: 'Senha incorreta.',
+    signInTitle: 'Bem-vindo',
+    signInSubtitle: 'Entre com sua conta Google para acessar seus dados.',
+    signInBtn: 'Entrar com Google',
+    continueBtn: 'Continuar',
+    signInLoading: 'Entrando...',
+    signInError: 'Erro ao entrar. Tente novamente.',
     logout: 'Sair',
-    settings: 'Configurações',
-    // settings modal
-    settingsTitle: 'Configurações',
-    changePwd: 'Alterar Senha',
-    currentPwd: 'Senha atual',
-    newPwd: 'Nova senha',
-    confirmNewPwd: 'Confirmar nova senha',
-    pwdChangeDone: 'Senha alterada com sucesso.',
-    sheetsBackup: 'Backup Google Sheets',
-    sheetsUrlLabel: 'URL do Apps Script',
-    sheetsUrlPlaceholder: 'https://script.google.com/macros/s/...',
-    sheetsHowTo: 'Como configurar',
-    syncNow: 'Sincronizar agora',
-    syncing: 'Enviando...',
-    syncDone: 'Backup enviado! Verifique a planilha.',
-    syncError: 'Erro ao sincronizar. Verifique a URL.',
-    sheetsUrlRequired: 'Cole a URL do Apps Script primeiro.',
-    closeModal: 'Fechar',
-    copyCode: 'Copiar código',
-    copied: 'Copiado!',
-    hosting: 'Publicar no GitHub Pages',
+    welcomeBack: 'Bem-vindo de volta',
+    // sheets sync
+    syncing: 'Sincronizando...',
+    syncDone: 'Backup salvo no Google Sheets!',
+    syncError: 'Erro ao sincronizar. Tente novamente.',
+    // hosting
+    settings: 'Publicar no GitHub Pages',
     hostingStep1: '1. Crie uma conta em github.com (gratuito)',
     hostingStep2: '2. Crie um repositório novo (ex: "horas")',
-    hostingStep3: '3. Faça upload dos 3 arquivos: index.html, app.js, style.css',
-    hostingStep4: '4. Vá em Settings → Pages → Branch: main → Save',
-    hostingStep5: '5. Seu link será: https://seuusuario.github.io/horas',
-    hostingStep6: '6. Compartilhe o link com seus colegas',
+    hostingStep3: '3. Faça upload: index.html, app.js, style.css',
+    hostingStep4: '4. Settings → Pages → Branch: main → Save',
+    hostingStep5: '5. Link: https://seuusuario.github.io/horas',
+    hostingStep6: '6. Compartilhe com seus colegas',
+    closeModal: 'Fechar',
   },
   en: {
     appTitle: 'Work Hours Tracker',
@@ -172,7 +126,6 @@ const i18n = {
     total: 'Total',
     weekOf: 'Week of',
     weekSubtotal: 'Week subtotal',
-    fortnightSubtotal: 'Fortnight subtotal',
     actions: 'Actions',
     manageCompanies: 'Manage Companies',
     companyName: 'Company name',
@@ -191,63 +144,41 @@ const i18n = {
     overtime: 'Overtime',
     overtimeNote: '(above 44h/week)',
     companyTotal: 'Company total',
-    noData: 'No data found for the selected filters.',
+    noData: 'No data found.',
     confirmDelete: 'Delete this entry?',
-    confirmRemoveCompany: 'Remove this company? Linked entries will be kept.',
+    confirmRemoveCompany: 'Remove company? Entries will be kept.',
     errorNoCompany: 'Please select a company.',
     errorNoDate: 'Please enter a date.',
     errorNoTimes: 'Please enter clock in and clock out times.',
     errorCompanyExists: 'Company already exists.',
     errorCompanyEmpty: 'Please enter a company name.',
-    errorCompanyHasEntries: 'Cannot remove: this company has time entries. Delete them first.',
+    errorCompanyHasEntries: 'Cannot remove: company has time entries.',
     period: 'Period',
-    fortnightLabel: 'fortnight',
     monthNames: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
-    regularHours: 'Regular hours',
-    otHours: 'Overtime hours',
     noCompanyForEntry: 'Add at least one company before logging hours.',
     weekdayNames: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
     // auth
-    authSetTitle: 'Create Access Password',
-    authSetSubtitle: 'Set a password to protect your data.',
-    authEnterTitle: 'Restricted Access',
-    authEnterSubtitle: 'Enter your password to continue.',
-    password: 'Password',
-    newPassword: 'New password',
-    confirmPassword: 'Confirm password',
-    unlock: 'Unlock',
-    createPwd: 'Create Password',
-    passwordRequired: 'Please enter a password.',
-    passwordMismatch: 'Passwords do not match.',
-    passwordWrong: 'Wrong password.',
-    logout: 'Log out',
-    settings: 'Settings',
-    // settings modal
-    settingsTitle: 'Settings',
-    changePwd: 'Change Password',
-    currentPwd: 'Current password',
-    newPwd: 'New password',
-    confirmNewPwd: 'Confirm new password',
-    pwdChangeDone: 'Password changed successfully.',
-    sheetsBackup: 'Google Sheets Backup',
-    sheetsUrlLabel: 'Apps Script URL',
-    sheetsUrlPlaceholder: 'https://script.google.com/macros/s/...',
-    sheetsHowTo: 'How to set up',
-    syncNow: 'Sync now',
-    syncing: 'Sending...',
-    syncDone: 'Backup sent! Check your spreadsheet.',
-    syncError: 'Sync error. Check the URL.',
-    sheetsUrlRequired: 'Paste the Apps Script URL first.',
-    closeModal: 'Close',
-    copyCode: 'Copy code',
-    copied: 'Copied!',
-    hosting: 'Publish on GitHub Pages',
+    signInTitle: 'Welcome',
+    signInSubtitle: 'Sign in with your Google account to access your data.',
+    signInBtn: 'Sign in with Google',
+    continueBtn: 'Continue',
+    signInLoading: 'Signing in...',
+    signInError: 'Sign-in error. Please try again.',
+    logout: 'Sign out',
+    welcomeBack: 'Welcome back',
+    // sheets sync
+    syncing: 'Syncing...',
+    syncDone: 'Backup saved to Google Sheets!',
+    syncError: 'Sync error. Please try again.',
+    // hosting
+    settings: 'Publish on GitHub Pages',
     hostingStep1: '1. Create an account at github.com (free)',
     hostingStep2: '2. Create a new repository (e.g. "horas")',
-    hostingStep3: '3. Upload the 3 files: index.html, app.js, style.css',
-    hostingStep4: '4. Go to Settings → Pages → Branch: main → Save',
-    hostingStep5: '5. Your link will be: https://yourusername.github.io/horas',
+    hostingStep3: '3. Upload: index.html, app.js, style.css',
+    hostingStep4: '4. Settings → Pages → Branch: main → Save',
+    hostingStep5: '5. Link: https://yourusername.github.io/horas',
     hostingStep6: '6. Share the link with your coworkers',
+    closeModal: 'Close',
   }
 };
 
@@ -271,63 +202,65 @@ function app() {
     reportTotals: { total: 0, overtime: 0 },
     reportGenerated: false,
 
-    // auth
-    auth: {
+    // Google auth
+    gauth: {
       unlocked: false,
-      hash: '',
-      mode: 'enter',   // 'set' | 'enter'
-      pwd: '',
-      newPwd: '',
-      confirmPwd: '',
+      user: null,       // { email, name, picture }
+      accessToken: null,
+      tokenExpiry: 0,
+      loading: false,
       error: ''
     },
 
-    // settings modal
     showSettings: false,
-    settings: {
-      section: 'pwd',  // 'pwd' | 'sheets' | 'hosting'
-      currentPwd: '',
-      newPwd: '',
-      confirmPwd: '',
-      error: '',
-      success: ''
-    },
-    sheetsUrl: '',
-    syncStatus: '',   // '' | 'syncing' | 'done' | 'error'
-    codeCopied: false,
+    syncStatus: '', // '' | 'syncing' | 'done' | 'error'
 
     // ── lifecycle ────────────────────────────────────────────
 
     init() {
-      try {
-        const raw = localStorage.getItem('horas_v1');
-        if (raw) {
-          const d = JSON.parse(raw);
-          this.lang = d.lang || 'pt';
-          this.companies = d.companies || [];
-          this.entries = d.entries || [];
-        }
-      } catch (_) {}
+      this.lang = localStorage.getItem('horas_lang') || 'pt';
 
-      // auth
-      const hash = localStorage.getItem('horas_pwd');
-      if (hash) {
-        this.auth.hash = hash;
-        this.auth.mode = 'enter';
-        this.auth.unlocked = false;
-      } else {
-        this.auth.mode = 'set';
-        this.auth.unlocked = false;
+      // Restore saved user (for "welcome back" screen)
+      try {
+        const saved = localStorage.getItem('horas_user');
+        if (saved) this.gauth.user = JSON.parse(saved);
+      } catch (_) {}
+    },
+
+    loadUserData() {
+      const email = this.gauth.user.email;
+      const key = 'horas_v1_' + email;
+
+      // Migrate from old non-email key (one-time)
+      let raw = localStorage.getItem(key);
+      if (!raw) {
+        const legacy = localStorage.getItem('horas_v1');
+        if (legacy) {
+          localStorage.setItem(key, legacy);
+          localStorage.removeItem('horas_v1');
+          raw = legacy;
+        }
       }
 
-      this.sheetsUrl = localStorage.getItem('horas_sheets_url') || '';
+      if (raw) {
+        try {
+          const d = JSON.parse(raw);
+          this.companies = d.companies || [];
+          this.entries = d.entries || [];
+        } catch (_) {}
+      } else {
+        this.companies = [];
+        this.entries = [];
+      }
+
       this.form.date = todayStr();
       this.report.selectedCompanies = this.companies.map(c => c.id);
     },
 
     persist() {
-      localStorage.setItem('horas_v1', JSON.stringify({
-        lang: this.lang,
+      if (!this.gauth.user) return;
+      const key = 'horas_v1_' + this.gauth.user.email;
+      localStorage.setItem(key, JSON.stringify({
         companies: this.companies,
         entries: this.entries
       }));
@@ -339,99 +272,159 @@ function app() {
 
     toggleLang() {
       this.lang = this.lang === 'pt' ? 'en' : 'pt';
-      this.persist();
+      localStorage.setItem('horas_lang', this.lang);
     },
 
-    // ── auth ─────────────────────────────────────────────────
+    // ── Google auth ──────────────────────────────────────────
 
-    async hashPwd(pwd) {
-      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pwd));
-      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    signIn() {
+      if (!tokenClient) { this.gauth.error = this.t('signInError'); return; }
+      this.gauth.loading = true;
+      this.gauth.error = '';
+
+      tokenClient.callback = async (response) => {
+        if (response.error) {
+          this.gauth.loading = false;
+          this.gauth.error = this.t('signInError');
+          return;
+        }
+
+        this.gauth.accessToken = response.access_token;
+        this.gauth.tokenExpiry = Date.now() + (response.expires_in - 60) * 1000;
+
+        try {
+          const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${this.gauth.accessToken}` }
+          });
+          const info = await res.json();
+          this.gauth.user = { email: info.email, name: info.name, picture: info.picture };
+          localStorage.setItem('horas_user', JSON.stringify(this.gauth.user));
+          this.loadUserData();
+          this.gauth.unlocked = true;
+          this.gauth.error = '';
+        } catch (_) {
+          this.gauth.error = this.t('signInError');
+        }
+        this.gauth.loading = false;
+      };
+
+      // returning user: try silent; new user: show consent
+      tokenClient.requestAccessToken({ prompt: this.gauth.user ? '' : 'consent' });
     },
 
-    async unlock() {
-      if (!this.auth.pwd) { this.auth.error = this.t('passwordRequired'); return; }
-      const h = await this.hashPwd(this.auth.pwd);
-      if (h === this.auth.hash) {
-        this.auth.unlocked = true;
-        this.auth.pwd = '';
-        this.auth.error = '';
-      } else {
-        this.auth.error = this.t('passwordWrong');
+    signOut() {
+      if (this.gauth.accessToken) {
+        google.accounts.oauth2.revoke(this.gauth.accessToken, () => {});
       }
+      this.gauth.unlocked = false;
+      this.gauth.accessToken = null;
+      this.gauth.user = null;
+      this.gauth.error = '';
+      localStorage.removeItem('horas_user');
+      this.companies = [];
+      this.entries = [];
     },
 
-    async createPassword() {
-      if (!this.auth.newPwd) { this.auth.error = this.t('passwordRequired'); return; }
-      if (this.auth.newPwd !== this.auth.confirmPwd) { this.auth.error = this.t('passwordMismatch'); return; }
-      const h = await this.hashPwd(this.auth.newPwd);
-      this.auth.hash = h;
-      localStorage.setItem('horas_pwd', h);
-      this.auth.unlocked = true;
-      this.auth.mode = 'enter';
-      this.auth.newPwd = '';
-      this.auth.confirmPwd = '';
-      this.auth.error = '';
+    // ── token refresh ────────────────────────────────────────
+
+    async ensureToken() {
+      if (this.gauth.accessToken && Date.now() < this.gauth.tokenExpiry) return true;
+      return new Promise((resolve) => {
+        tokenClient.callback = (response) => {
+          if (response.error) { resolve(false); return; }
+          this.gauth.accessToken = response.access_token;
+          this.gauth.tokenExpiry = Date.now() + (response.expires_in - 60) * 1000;
+          resolve(true);
+        };
+        tokenClient.requestAccessToken({ prompt: '' });
+      });
     },
 
-    logout() {
-      this.auth.unlocked = false;
-      this.auth.mode = 'enter';
-      this.auth.pwd = '';
-      this.auth.error = '';
-    },
+    // ── Google Sheets sync ───────────────────────────────────
 
-    // ── settings ─────────────────────────────────────────────
+    async findOrCreateSpreadsheet() {
+      const key = 'horas_sheet_' + this.gauth.user.email;
+      let sheetId = localStorage.getItem(key);
 
-    openSettings(section) {
-      this.settings = { section: section || 'pwd', currentPwd: '', newPwd: '', confirmPwd: '', error: '', success: '' };
-      this.showSettings = true;
-    },
+      if (sheetId) {
+        const res = await fetch(
+          `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=spreadsheetId`,
+          { headers: { Authorization: `Bearer ${this.gauth.accessToken}` } }
+        );
+        if (res.ok) return sheetId;
+      }
 
-    async changePassword() {
-      const s = this.settings;
-      s.error = ''; s.success = '';
-      if (!s.currentPwd) { s.error = this.t('passwordRequired'); return; }
-      const curHash = await this.hashPwd(s.currentPwd);
-      if (curHash !== this.auth.hash) { s.error = this.t('passwordWrong'); return; }
-      if (!s.newPwd) { s.error = this.t('passwordRequired'); return; }
-      if (s.newPwd !== s.confirmPwd) { s.error = this.t('passwordMismatch'); return; }
-      const h = await this.hashPwd(s.newPwd);
-      this.auth.hash = h;
-      localStorage.setItem('horas_pwd', h);
-      s.currentPwd = ''; s.newPwd = ''; s.confirmPwd = '';
-      s.success = this.t('pwdChangeDone');
-    },
-
-    saveSheetsUrl() {
-      localStorage.setItem('horas_sheets_url', this.sheetsUrl);
+      // Create new spreadsheet
+      const res = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.gauth.accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          properties: { title: 'Backup Horas' },
+          sheets: [
+            { properties: { title: 'Lancamentos', index: 0 } },
+            { properties: { title: 'Log', index: 1 } }
+          ]
+        })
+      });
+      const data = await res.json();
+      sheetId = data.spreadsheetId;
+      localStorage.setItem(key, sheetId);
+      return sheetId;
     },
 
     async syncToSheets() {
-      if (!this.sheetsUrl.trim()) { alert(this.t('sheetsUrlRequired')); return; }
       this.syncStatus = 'syncing';
       try {
-        await fetch(this.sheetsUrl, {
+        const ok = await this.ensureToken();
+        if (!ok) { this.syncStatus = 'error'; return; }
+
+        const sheetId = await this.findOrCreateSpreadsheet();
+        const token = this.gauth.accessToken;
+        const base = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
+
+        // Build rows
+        const cmap = {};
+        this.companies.forEach(c => cmap[c.id] = c.name);
+        const headers = ['Data','Empresa','Entrada','Saida Almoco','Retorno Almoco','Saida','Sem Almoco'];
+        const rows = [headers];
+        const sorted = [...this.entries].sort((a,b) => a.date.localeCompare(b.date));
+        for (const e of sorted) {
+          rows.push([
+            e.date, cmap[e.companyId] || '?',
+            e.entryTime,
+            e.noLunch ? '' : (e.lunchOut || ''),
+            e.noLunch ? '' : (e.lunchReturn || ''),
+            e.exitTime,
+            e.noLunch ? 'Sim' : 'Nao'
+          ]);
+        }
+
+        // Clear then write
+        await fetch(`${base}/values/Lancamentos!A:G:clear`, {
           method: 'POST',
-          mode: 'no-cors',
-          body: JSON.stringify({
-            timestamp: new Date().toISOString(),
-            companies: this.companies,
-            entries: this.entries
-          })
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
         });
+        await fetch(`${base}/values/Lancamentos!A1?valueInputOption=RAW`, {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ values: rows })
+        });
+
+        // Append log
+        await fetch(`${base}/values/Log!A:C:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ values: [[new Date().toLocaleString('pt-BR'), this.entries.length, this.companies.length]] })
+        });
+
         this.syncStatus = 'done';
       } catch (_) {
         this.syncStatus = 'error';
       }
       setTimeout(() => { this.syncStatus = ''; }, 5000);
-    },
-
-    copyAppsScript() {
-      navigator.clipboard.writeText(APPS_SCRIPT_CODE).then(() => {
-        this.codeCopied = true;
-        setTimeout(() => { this.codeCopied = false; }, 2500);
-      });
     },
 
     // ── time helpers ─────────────────────────────────────────
@@ -461,14 +454,12 @@ function app() {
     fmt(mins) {
       if (!mins && mins !== 0) return '';
       const abs = Math.abs(mins);
-      const h = Math.floor(abs / 60);
-      const m = abs % 60;
-      return (mins < 0 ? '-' : '') + h + 'h' + String(m).padStart(2, '0');
+      return (mins < 0 ? '-' : '') + Math.floor(abs/60) + 'h' + String(abs%60).padStart(2,'0');
     },
 
     fmtDate(s) {
       if (!s) return '';
-      const [y, mo, d] = s.split('-');
+      const [y,mo,d] = s.split('-');
       return `${d}/${mo}/${y}`;
     },
 
@@ -484,33 +475,28 @@ function app() {
       const offset = day === 0 ? -6 : 1 - day;
       const mon = new Date(d);
       mon.setDate(d.getDate() + offset);
-      return mon.toISOString().slice(0, 10);
+      return mon.toISOString().slice(0,10);
     },
 
     fortnightId(dateStr) {
-      const [y, mo, d] = dateStr.split('-').map(Number);
-      return `${y}-${String(mo).padStart(2,'0')}-${d <= 15 ? '1' : '2'}`;
+      const [y,mo,d] = dateStr.split('-').map(Number);
+      return `${y}-${String(mo).padStart(2,'0')}-${d<=15?'1':'2'}`;
     },
 
     fortnightLabel(fid) {
-      const [y, mo, half] = fid.split('-');
-      const mn = this.t('monthNames')[parseInt(mo, 10) - 1];
-      return half === '1' ? `1–15 ${mn} ${y}` : `16–31 ${mn} ${y}`;
+      const [y,mo,half] = fid.split('-');
+      const mn = this.t('monthNames')[parseInt(mo,10)-1];
+      return half==='1' ? `1–15 ${mn} ${y}` : `16–31 ${mn} ${y}`;
     },
 
     // ── entries ──────────────────────────────────────────────
 
     sortedEntries() {
-      return [...this.entries].sort((a, b) => b.date.localeCompare(a.date) || b.entryTime.localeCompare(a.entryTime));
+      return [...this.entries].sort((a,b) => b.date.localeCompare(a.date)||b.entryTime.localeCompare(a.entryTime));
     },
 
-    cname(id) {
-      return this.companies.find(c => c.id === id)?.name ?? '?';
-    },
-
-    previewTotal() {
-      return this.fmt(this.calcMinutes(this.form));
-    },
+    cname(id) { return this.companies.find(c=>c.id===id)?.name ?? '?'; },
+    previewTotal() { return this.fmt(this.calcMinutes(this.form)); },
 
     validateForm() {
       if (!this.form.companyId) return this.t('errorNoCompany');
@@ -534,8 +520,8 @@ function app() {
         noLunch: this.form.noLunch
       };
       if (this.editingId) {
-        const i = this.entries.findIndex(e => e.id === this.editingId);
-        if (i !== -1) this.entries[i] = entry;
+        const i = this.entries.findIndex(e=>e.id===this.editingId);
+        if (i!==-1) this.entries[i] = entry;
         this.editingId = null;
       } else {
         this.entries.push(entry);
@@ -545,37 +531,32 @@ function app() {
     },
 
     editEntry(id) {
-      const e = this.entries.find(e => e.id === id);
+      const e = this.entries.find(e=>e.id===id);
       if (!e) return;
       this.editingId = id;
       this.form = {
         companyId: e.companyId, date: e.date,
         entryTime: e.entryTime, exitTime: e.exitTime,
-        lunchOut: e.lunchOut || '', lunchReturn: e.lunchReturn || '',
+        lunchOut: e.lunchOut||'', lunchReturn: e.lunchReturn||'',
         noLunch: e.noLunch
       };
       this.formError = '';
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({top:0,behavior:'smooth'});
     },
 
     deleteEntry(id) {
       if (!confirm(this.t('confirmDelete'))) return;
-      this.entries = this.entries.filter(e => e.id !== id);
-      if (this.editingId === id) this.cancelEdit();
+      this.entries = this.entries.filter(e=>e.id!==id);
+      if (this.editingId===id) this.cancelEdit();
       this.persist();
     },
 
-    cancelEdit() {
-      this.editingId = null;
-      this.resetForm();
-    },
+    cancelEdit() { this.editingId=null; this.resetForm(); },
 
     resetForm() {
       this.form = {
-        companyId: this.form.companyId,
-        date: todayStr(),
-        entryTime: '', exitTime: '',
-        lunchOut: '', lunchReturn: '', noLunch: false
+        companyId: this.form.companyId, date: todayStr(),
+        entryTime:'', exitTime:'', lunchOut:'', lunchReturn:'', noLunch:false
       };
       this.formError = '';
     },
@@ -585,34 +566,30 @@ function app() {
     addCompany() {
       const name = this.newCompanyName.trim();
       if (!name) { this.companyError = this.t('errorCompanyEmpty'); return; }
-      if (this.companies.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+      if (this.companies.some(c=>c.name.toLowerCase()===name.toLowerCase())) {
         this.companyError = this.t('errorCompanyExists'); return;
       }
       this.companyError = '';
-      this.companies.push({ id: uid(), name });
+      this.companies.push({id:uid(), name});
       this.newCompanyName = '';
       this.persist();
     },
 
     removeCompany(id) {
-      if (this.entries.some(e => e.companyId === id)) {
-        alert(this.t('errorCompanyHasEntries')); return;
-      }
+      if (this.entries.some(e=>e.companyId===id)) { alert(this.t('errorCompanyHasEntries')); return; }
       if (!confirm(this.t('confirmRemoveCompany'))) return;
-      this.companies = this.companies.filter(c => c.id !== id);
+      this.companies = this.companies.filter(c=>c.id!==id);
       this.persist();
     },
 
     // ── report ───────────────────────────────────────────────
 
     toggleAllCompanies(e) {
-      this.report.selectedCompanies = e.target.checked
-        ? this.companies.map(c => c.id)
-        : [];
+      this.report.selectedCompanies = e.target.checked ? this.companies.map(c=>c.id) : [];
     },
 
     generateReport() {
-      const { dateFrom, dateTo, selectedCompanies } = this.report;
+      const {dateFrom, dateTo, selectedCompanies} = this.report;
       const filtered = this.entries.filter(e => {
         if (selectedCompanies.length && !selectedCompanies.includes(e.companyId)) return false;
         if (dateFrom && e.date < dateFrom) return false;
@@ -621,153 +598,107 @@ function app() {
       });
 
       const byCompany = {};
-      for (const e of filtered) {
-        (byCompany[e.companyId] = byCompany[e.companyId] || []).push(e);
-      }
+      for (const e of filtered) (byCompany[e.companyId]=byCompany[e.companyId]||[]).push(e);
 
       this.reportData = [];
-      let grandTotal = 0, grandOT = 0;
+      let grandTotal=0, grandOT=0;
 
       for (const [companyId, ces] of Object.entries(byCompany)) {
-        ces.sort((a, b) => a.date.localeCompare(b.date));
-
+        ces.sort((a,b)=>a.date.localeCompare(b.date));
         const byWeek = {};
         for (const e of ces) {
           const wk = this.weekStart(e.date);
-          (byWeek[wk] = byWeek[wk] || []).push({ ...e, mins: this.calcMinutes(e) });
+          (byWeek[wk]=byWeek[wk]||[]).push({...e, mins:this.calcMinutes(e)});
         }
-
         const byFortnight = {};
         for (const e of ces) {
           const fid = this.fortnightId(e.date);
-          byFortnight[fid] = (byFortnight[fid] || 0) + this.calcMinutes(e);
+          byFortnight[fid] = (byFortnight[fid]||0) + this.calcMinutes(e);
         }
 
         const rows = [];
-        let companyTotal = 0, companyOT = 0;
+        let companyTotal=0, companyOT=0;
 
         for (const wk of Object.keys(byWeek).sort()) {
-          const wEntries = byWeek[wk];
-          let weekTotal = 0;
-          for (const e of wEntries) {
+          let weekTotal=0;
+          for (const e of byWeek[wk]) {
             rows.push({
-              type: 'entry', id: e.id,
-              date: this.fmtDateWithDay(e.date),
-              entryTime: e.entryTime,
-              lunchOut: e.noLunch ? '—' : (e.lunchOut || '—'),
-              lunchReturn: e.noLunch ? '—' : (e.lunchReturn || '—'),
-              exitTime: e.exitTime,
-              dayTotal: this.fmt(e.mins),
-              weekTotal: '', ot: ''
+              type:'entry', id:e.id, date:this.fmtDateWithDay(e.date),
+              entryTime:e.entryTime,
+              lunchOut: e.noLunch?'—':(e.lunchOut||'—'),
+              lunchReturn: e.noLunch?'—':(e.lunchReturn||'—'),
+              exitTime:e.exitTime, dayTotal:this.fmt(e.mins), weekTotal:'', ot:''
             });
-            weekTotal += e.mins;
-            companyTotal += e.mins;
+            weekTotal+=e.mins; companyTotal+=e.mins;
           }
-          const ot = Math.max(0, weekTotal - 44 * 60);
-          companyOT += ot;
+          const ot=Math.max(0,weekTotal-44*60);
+          companyOT+=ot;
           rows.push({
-            type: 'week-sub', id: 'ws-' + wk,
-            date: this.t('weekSubtotal') + ' (' + this.fmtDate(wk) + ')',
-            entryTime: '', lunchOut: '', lunchReturn: '', exitTime: '',
-            dayTotal: '',
-            weekTotal: this.fmt(weekTotal),
-            ot: ot > 0 ? '+' + this.fmt(ot) + ' OT' : ''
+            type:'week-sub', id:'ws-'+wk,
+            date:this.t('weekSubtotal')+' ('+this.fmtDate(wk)+')',
+            entryTime:'',lunchOut:'',lunchReturn:'',exitTime:'',dayTotal:'',
+            weekTotal:this.fmt(weekTotal),
+            ot: ot>0?'+'+this.fmt(ot)+' OT':''
           });
         }
 
         const fortnights = Object.entries(byFortnight)
-          .sort((a, b) => a[0].localeCompare(b[0]))
-          .map(([fid, mins]) => ({ label: this.fortnightLabel(fid), mins }));
+          .sort((a,b)=>a[0].localeCompare(b[0]))
+          .map(([fid,mins])=>({label:this.fortnightLabel(fid),mins}));
 
         this.reportData.push({
-          companyId, companyName: this.cname(companyId),
-          rows, totalMinutes: companyTotal,
-          overtimeMinutes: companyOT, fortnights
+          companyId, companyName:this.cname(companyId),
+          rows, totalMinutes:companyTotal, overtimeMinutes:companyOT, fortnights
         });
-
-        grandTotal += companyTotal;
-        grandOT += companyOT;
+        grandTotal+=companyTotal; grandOT+=companyOT;
       }
 
-      this.reportTotals = { total: grandTotal, overtime: grandOT };
+      this.reportTotals = {total:grandTotal, overtime:grandOT};
       this.reportGenerated = true;
     },
 
     // ── export PDF ───────────────────────────────────────────
 
     exportPDF() {
-      if (!window.jspdf) { alert('jsPDF not loaded yet, please wait.'); return; }
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-      const pFrom = this.report.dateFrom || '—';
-      const pTo = this.report.dateTo || '—';
+      if (!window.jspdf) { alert('jsPDF not loaded yet.'); return; }
+      const {jsPDF} = window.jspdf;
+      const doc = new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
       doc.setFontSize(14);
       doc.text(this.t('appTitle'), 14, 14);
       doc.setFontSize(9);
-      doc.text(`${this.t('period')}: ${pFrom} → ${pTo}`, 14, 20);
-      let y = 28;
-      const head = [[
-        this.t('date'), this.t('entryTime'), this.t('lunchOut'),
-        this.t('lunchReturn'), this.t('exitTime'), this.t('dayTotal'),
-        this.t('weekSubtotal'), 'OT'
-      ]];
+      doc.text(`${this.t('period')}: ${this.report.dateFrom||'—'} → ${this.report.dateTo||'—'}`, 14, 20);
+      let y=28;
+      const head=[[this.t('date'),this.t('entryTime'),this.t('lunchOut'),this.t('lunchReturn'),this.t('exitTime'),this.t('dayTotal'),this.t('weekSubtotal'),'OT']];
       for (const sec of this.reportData) {
-        if (y > 170) { doc.addPage(); y = 14; }
-        doc.setFontSize(11);
-        doc.setFont(undefined, 'bold');
-        doc.text(sec.companyName, 14, y);
-        doc.setFont(undefined, 'normal');
-        y += 5;
-        const body = sec.rows.map(r => [
-          r.date, r.entryTime, r.lunchOut, r.lunchReturn,
-          r.exitTime, r.dayTotal, r.weekTotal, r.ot
-        ]);
-        body.push([this.t('companyTotal'), '', '', '', '',
-          this.fmt(sec.totalMinutes), '',
-          sec.overtimeMinutes > 0 ? this.fmt(sec.overtimeMinutes) : '']);
-        doc.autoTable({
-          startY: y, head, body,
-          styles: { fontSize: 7.5, cellPadding: 1.5 },
-          headStyles: { fillColor: [26, 54, 93] },
-          margin: { left: 14, right: 14 }
-        });
-        y = doc.lastAutoTable.finalY + 5;
+        if (y>170) {doc.addPage(); y=14;}
+        doc.setFontSize(11); doc.setFont(undefined,'bold');
+        doc.text(sec.companyName,14,y);
+        doc.setFont(undefined,'normal'); y+=5;
+        const body=sec.rows.map(r=>[r.date,r.entryTime,r.lunchOut,r.lunchReturn,r.exitTime,r.dayTotal,r.weekTotal,r.ot]);
+        body.push([this.t('companyTotal'),'','','','',this.fmt(sec.totalMinutes),'',sec.overtimeMinutes>0?this.fmt(sec.overtimeMinutes):'']);
+        doc.autoTable({startY:y,head,body,styles:{fontSize:7.5,cellPadding:1.5},headStyles:{fillColor:[26,54,93]},margin:{left:14,right:14}});
+        y=doc.lastAutoTable.finalY+5;
         doc.setFontSize(8);
-        for (const ft of sec.fortnights) {
-          doc.text(`${ft.label}: ${this.fmt(ft.mins)}`, 14, y);
-          y += 4;
-        }
-        y += 4;
+        for (const ft of sec.fortnights) { doc.text(`${ft.label}: ${this.fmt(ft.mins)}`,14,y); y+=4; }
+        y+=4;
       }
-      doc.setFontSize(10);
-      doc.setFont(undefined, 'bold');
-      doc.text(`${this.t('totalFiltered')}: ${this.fmt(this.reportTotals.total)}   ${this.t('overtime')}: ${this.fmt(this.reportTotals.overtime)}`, 14, y + 4);
+      doc.setFontSize(10); doc.setFont(undefined,'bold');
+      doc.text(`${this.t('totalFiltered')}: ${this.fmt(this.reportTotals.total)}   ${this.t('overtime')}: ${this.fmt(this.reportTotals.overtime)}`,14,y+4);
       doc.save(`horas-${todayStr()}.pdf`);
     },
 
     // ── export XLSX ──────────────────────────────────────────
 
     exportXLSX() {
-      if (!window.XLSX) { alert('SheetJS not loaded yet, please wait.'); return; }
+      if (!window.XLSX) { alert('SheetJS not loaded yet.'); return; }
       const wb = XLSX.utils.book_new();
       for (const sec of this.reportData) {
-        const aoa = [[
-          this.t('date'), this.t('entryTime'), this.t('lunchOut'),
-          this.t('lunchReturn'), this.t('exitTime'), this.t('dayTotal'),
-          this.t('weekSubtotal'), 'OT'
-        ]];
-        for (const r of sec.rows) {
-          aoa.push([r.date, r.entryTime, r.lunchOut, r.lunchReturn, r.exitTime, r.dayTotal, r.weekTotal, r.ot]);
-        }
-        aoa.push([this.t('companyTotal'), '', '', '', '',
-          this.fmt(sec.totalMinutes), '',
-          sec.overtimeMinutes > 0 ? this.fmt(sec.overtimeMinutes) : '']);
+        const aoa=[[this.t('date'),this.t('entryTime'),this.t('lunchOut'),this.t('lunchReturn'),this.t('exitTime'),this.t('dayTotal'),this.t('weekSubtotal'),'OT']];
+        for (const r of sec.rows) aoa.push([r.date,r.entryTime,r.lunchOut,r.lunchReturn,r.exitTime,r.dayTotal,r.weekTotal,r.ot]);
+        aoa.push([this.t('companyTotal'),'','','','',this.fmt(sec.totalMinutes),'',sec.overtimeMinutes>0?this.fmt(sec.overtimeMinutes):'']);
         aoa.push([]);
-        for (const ft of sec.fortnights) {
-          aoa.push([ft.label, this.fmt(ft.mins)]);
-        }
-        const ws = XLSX.utils.aoa_to_sheet(aoa);
-        XLSX.utils.book_append_sheet(wb, ws, sec.companyName.slice(0, 31));
+        for (const ft of sec.fortnights) aoa.push([ft.label,this.fmt(ft.mins)]);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), sec.companyName.slice(0,31));
       }
       XLSX.writeFile(wb, `horas-${todayStr()}.xlsx`);
     }
@@ -775,9 +706,6 @@ function app() {
 }
 
 function uid() {
-  return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36);
+  return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)+Date.now().toString(36);
 }
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
+function todayStr() { return new Date().toISOString().slice(0,10); }

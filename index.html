@@ -6,6 +6,7 @@
   <title>Controle de Carga Horária</title>
   <link rel="stylesheet" href="style.css">
   <script src="app.js"></script>
+  <script async src="https://accounts.google.com/gsi/client" onload="initGoogleSignIn()"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -16,115 +17,53 @@
 <!-- ═══════════════════════════════════════════════════════════
      AUTH OVERLAY
 ════════════════════════════════════════════════════════════ -->
-<div class="auth-overlay" x-show="!auth.unlocked" x-transition>
+<div class="auth-overlay" x-show="!gauth.unlocked" x-transition>
   <div class="auth-card">
     <div class="auth-logo">⏱</div>
     <h1 class="auth-app-title" x-text="t('appTitle')"></h1>
 
-    <!-- Language toggle on login screen -->
     <button class="lang-btn auth-lang" @click="toggleLang()" x-text="lang==='pt'?'EN':'PT'"></button>
 
-    <!-- SET PASSWORD (first time) -->
-    <div x-show="auth.mode==='set'">
-      <h2 class="auth-title" x-text="t('authSetTitle')"></h2>
-      <p class="auth-subtitle" x-text="t('authSetSubtitle')"></p>
-      <div class="auth-fields">
-        <input type="password" class="auth-input" x-model="auth.newPwd"
-          :placeholder="t('newPassword')" @keydown.enter="createPassword()">
-        <input type="password" class="auth-input" x-model="auth.confirmPwd"
-          :placeholder="t('confirmPassword')" @keydown.enter="createPassword()">
-      </div>
-      <p class="auth-error" x-show="auth.error" x-text="auth.error"></p>
-      <button class="btn-primary auth-btn" @click="createPassword()" x-text="t('createPwd')"></button>
-    </div>
+    <div x-show="gauth.loading" class="auth-loading" x-text="t('signInLoading')"></div>
 
-    <!-- ENTER PASSWORD (returning) -->
-    <div x-show="auth.mode==='enter'">
-      <h2 class="auth-title" x-text="t('authEnterTitle')"></h2>
-      <p class="auth-subtitle" x-text="t('authEnterSubtitle')"></p>
-      <div class="auth-fields">
-        <input type="password" class="auth-input" x-model="auth.pwd"
-          :placeholder="t('password')" @keydown.enter="unlock()" autofocus>
+    <div x-show="!gauth.loading">
+      <!-- Returning user: show avatar + continue -->
+      <div x-show="gauth.user">
+        <img class="auth-avatar" :src="gauth.user?.picture" :alt="gauth.user?.name">
+        <h2 class="auth-title" x-text="t('welcomeBack') + ', ' + (gauth.user?.name?.split(' ')[0] ?? '')"></h2>
+        <p class="auth-subtitle" x-text="gauth.user?.email"></p>
+        <button class="btn-google" @click="signIn()">
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="google-icon" alt="">
+          <span x-text="t('continueBtn')"></span>
+        </button>
+        <button class="btn-link" @click="gauth.user=null;localStorage.removeItem('horas_user')"
+          x-text="lang==='pt'?'Usar outra conta':'Use another account'"></button>
       </div>
-      <p class="auth-error" x-show="auth.error" x-text="auth.error"></p>
-      <button class="btn-primary auth-btn" @click="unlock()" x-text="t('unlock')"></button>
+      <!-- First-time sign in -->
+      <div x-show="!gauth.user">
+        <h2 class="auth-title" x-text="t('signInTitle')"></h2>
+        <p class="auth-subtitle" x-text="t('signInSubtitle')"></p>
+        <button class="btn-google" @click="signIn()">
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="google-icon" alt="">
+          <span x-text="t('signInBtn')"></span>
+        </button>
+      </div>
+
+      <p class="auth-error" x-show="gauth.error" x-text="gauth.error"></p>
     </div>
   </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════
-     SETTINGS MODAL
+     SETTINGS MODAL (GitHub Pages hosting)
 ════════════════════════════════════════════════════════════ -->
 <div class="modal-backdrop" x-show="showSettings" @click.self="showSettings=false" x-transition>
   <div class="modal-card">
-
     <div class="modal-header">
-      <h2 x-text="t('settingsTitle')"></h2>
+      <h2 x-text="t('settings')"></h2>
       <button class="modal-close" @click="showSettings=false">✕</button>
     </div>
-
-    <!-- Modal tabs -->
-    <div class="modal-tabs">
-      <button :class="{active: settings.section==='pwd'}" @click="settings.section='pwd'" x-text="t('changePwd')"></button>
-      <button :class="{active: settings.section==='sheets'}" @click="settings.section='sheets'" x-text="t('sheetsBackup')"></button>
-      <button :class="{active: settings.section==='hosting'}" @click="settings.section='hosting'" x-text="t('hosting')"></button>
-    </div>
-
-    <!-- ── Change password ── -->
-    <div x-show="settings.section==='pwd'" class="modal-body">
-      <div class="field" style="margin-bottom:.75rem">
-        <label class="field-label" x-text="t('currentPwd')"></label>
-        <input type="password" x-model="settings.currentPwd" :placeholder="t('currentPwd')">
-      </div>
-      <div class="field" style="margin-bottom:.75rem">
-        <label class="field-label" x-text="t('newPwd')"></label>
-        <input type="password" x-model="settings.newPwd" :placeholder="t('newPwd')">
-      </div>
-      <div class="field" style="margin-bottom:1rem">
-        <label class="field-label" x-text="t('confirmNewPwd')"></label>
-        <input type="password" x-model="settings.confirmPwd" :placeholder="t('confirmNewPwd')" @keydown.enter="changePassword()">
-      </div>
-      <p class="err" x-show="settings.error" x-text="settings.error"></p>
-      <p class="success-msg" x-show="settings.success" x-text="settings.success"></p>
-      <button class="btn-primary" @click="changePassword()" x-text="t('save')"></button>
-    </div>
-
-    <!-- ── Google Sheets ── -->
-    <div x-show="settings.section==='sheets'" class="modal-body">
-      <div class="field" style="margin-bottom:.75rem">
-        <label class="field-label" x-text="t('sheetsUrlLabel')"></label>
-        <input type="url" x-model="sheetsUrl" :placeholder="t('sheetsUrlPlaceholder')"
-          @blur="saveSheetsUrl()">
-      </div>
-
-      <details class="howto-details">
-        <summary x-text="t('sheetsHowTo')"></summary>
-        <ol class="howto-steps">
-          <li>Abra o Google Drive → Novo → <strong>Google Planilhas</strong></li>
-          <li>No menu: <strong>Extensões → Apps Script</strong></li>
-          <li>Apague o código existente e cole o código abaixo</li>
-          <li>Salve (Ctrl+S) e clique em <strong>Implantar → Nova implantação</strong></li>
-          <li>Tipo: <em>Aplicativo da Web</em> · Executar como: <em>Eu mesmo</em> · Acesso: <em>Qualquer pessoa</em></li>
-          <li>Clique em <strong>Implantar</strong>, autorize, e copie a URL gerada</li>
-          <li>Cole a URL no campo acima e clique em Sincronizar</li>
-        </ol>
-        <div class="code-block-wrap">
-          <button class="btn-copy" @click="copyAppsScript()"
-            x-text="codeCopied ? t('copied') : t('copyCode')"></button>
-          <pre class="code-block" id="appsScriptCode"></pre>
-        </div>
-      </details>
-
-      <div class="sync-status" x-show="syncStatus==='done'" x-text="t('syncDone')"></div>
-      <div class="sync-status sync-error" x-show="syncStatus==='error'" x-text="t('syncError')"></div>
-
-      <button class="btn-primary" @click="syncToSheets()"
-        :disabled="syncStatus==='syncing'"
-        x-text="syncStatus==='syncing' ? t('syncing') : t('syncNow')"></button>
-    </div>
-
-    <!-- ── GitHub Pages hosting ── -->
-    <div x-show="settings.section==='hosting'" class="modal-body">
+    <div class="modal-body">
       <ol class="howto-steps">
         <li x-text="t('hostingStep1')"></li>
         <li x-text="t('hostingStep2')"></li>
@@ -133,27 +72,26 @@
         <li x-text="t('hostingStep5')"></li>
         <li x-text="t('hostingStep6')"></li>
       </ol>
-      <p style="margin-top:1rem;font-size:.82rem;color:#718096">
-        Cada colega terá seus próprios dados no celular dele (localStorage independente por browser).
-        A senha que cada um definir protege apenas o acesso no dispositivo deles.
-      </p>
     </div>
-
   </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════
-     APP (visible only when unlocked)
+     APP (visible only when signed in)
 ════════════════════════════════════════════════════════════ -->
-<div x-show="auth.unlocked">
+<div x-show="gauth.unlocked">
 
 <header>
   <div class="header-inner">
     <h1 x-text="t('appTitle')"></h1>
     <div class="header-actions">
       <button class="lang-btn" @click="toggleLang()" x-text="lang==='pt'?'EN':'PT'"></button>
-      <button class="icon-btn" @click="openSettings('pwd')" title="Configurações">⚙</button>
-      <button class="icon-btn icon-btn-danger" @click="logout()" :title="t('logout')">⏻</button>
+      <button class="icon-btn" @click="showSettings=true" title="Configurações">⚙</button>
+      <div class="user-chip" x-show="gauth.user">
+        <img class="user-avatar" :src="gauth.user?.picture" :alt="gauth.user?.name">
+        <span class="user-name" x-text="gauth.user?.name?.split(' ')[0]"></span>
+      </div>
+      <button class="icon-btn icon-btn-danger" @click="signOut()" :title="t('logout')">⏻</button>
     </div>
   </div>
   <nav>
@@ -314,9 +252,13 @@
         <button class="btn-secondary" x-show="reportData.length>0" @click="exportPDF()" x-text="t('exportPDF')"></button>
         <button class="btn-secondary" x-show="reportData.length>0" @click="exportXLSX()" x-text="t('exportXLSX')"></button>
         <button class="btn-secondary btn-sheets" x-show="reportData.length>0"
-          @click="openSettings('sheets')" x-text="t('syncSheets')">
+          @click="syncToSheets()"
+          :disabled="syncStatus==='syncing'"
+          x-text="syncStatus==='syncing' ? t('syncing') : t('syncSheets')">
         </button>
       </div>
+      <div class="sync-status" x-show="syncStatus==='done'" x-text="t('syncDone')"></div>
+      <div class="sync-status sync-error" x-show="syncStatus==='error'" x-text="t('syncError')"></div>
     </div>
 
     <div x-show="reportGenerated">
@@ -395,15 +337,7 @@
   <span x-text="t('appTitle') + ' · 2025'"></span>
 </footer>
 
-</div><!-- /auth.unlocked -->
-
-<script>
-  // Populate the code block after DOM is ready (avoids XSS via innerHTML)
-  document.addEventListener('DOMContentLoaded', () => {
-    const el = document.getElementById('appsScriptCode');
-    if (el) el.textContent = APPS_SCRIPT_CODE;
-  });
-</script>
+</div><!-- /gauth.unlocked -->
 
 </body>
 </html>

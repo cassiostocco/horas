@@ -27,19 +27,40 @@ body {
 .auth-app-title { font-size: 1rem; font-weight: 700; color: #1a365d; margin-bottom: 1.5rem; }
 .auth-title { font-size: 1.1rem; font-weight: 700; color: #1a202c; margin-bottom: .3rem; }
 .auth-subtitle { font-size: .82rem; color: #718096; margin-bottom: 1.25rem; }
-.auth-fields { display: flex; flex-direction: column; gap: .6rem; margin-bottom: .75rem; }
-.auth-input {
-  padding: .6rem .875rem; border: 1.5px solid #cbd5e0; border-radius: 8px;
-  font-size: .95rem; text-align: center; width: 100%;
-  transition: border-color .15s;
-}
-.auth-input:focus { outline: none; border-color: #3182ce; box-shadow: 0 0 0 3px rgba(49,130,206,.15); }
-.auth-error { color: #c53030; font-size: .82rem; margin-bottom: .5rem; font-weight: 500; }
-.auth-btn { width: 100%; padding: .65rem; font-size: .95rem; margin-top: .25rem; }
+.auth-error { color: #c53030; font-size: .82rem; margin-top: .75rem; font-weight: 500; }
+.auth-loading { color: #718096; font-size: .9rem; padding: 1.5rem 0; }
 .auth-lang {
   position: absolute; top: 1rem; right: 1rem;
   font-size: .75rem; padding: .25rem .6rem;
   background: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0;
+}
+
+/* ── Auth avatar (sign-in card) ── */
+.auth-avatar {
+  width: 64px; height: 64px; border-radius: 50%;
+  margin: 0 auto .75rem; display: block;
+  border: 3px solid #e2e8f0;
+}
+
+/* ── Google sign-in button ── */
+.btn-google {
+  display: flex; align-items: center; justify-content: center; gap: .6rem;
+  width: 100%; padding: .65rem 1rem;
+  background: #fff; color: #3c4043;
+  border: 1.5px solid #dadce0; border-radius: 8px;
+  font-size: .92rem; font-weight: 500; cursor: pointer;
+  transition: background .15s, box-shadow .15s;
+  margin-top: .5rem;
+}
+.btn-google:hover { background: #f8f9fa; box-shadow: 0 1px 6px rgba(0,0,0,.12); }
+.google-icon { width: 18px; height: 18px; flex-shrink: 0; }
+
+/* ── "Use another account" link ── */
+.btn-link {
+  background: transparent; border: none;
+  color: #3182ce; font-size: .8rem; cursor: pointer;
+  margin-top: .6rem; text-decoration: underline;
+  display: block; width: 100%; text-align: center;
 }
 
 /* ── Settings modal ── */
@@ -51,7 +72,7 @@ body {
 }
 .modal-card {
   background: #fff; border-radius: 14px;
-  width: 100%; max-width: 520px;
+  width: 100%; max-width: 480px;
   max-height: 90vh; overflow-y: auto;
   box-shadow: 0 20px 60px rgba(0,0,0,.3);
 }
@@ -67,59 +88,21 @@ body {
   border-radius: 5px; transition: background .15s;
 }
 .modal-close:hover { background: #f7fafc; color: #1a202c; }
-.modal-tabs {
-  display: flex; border-bottom: 1px solid #e2e8f0;
-  padding: 0 1.5rem;
-}
-.modal-tabs button {
-  background: transparent; border: none; border-bottom: 2px solid transparent;
-  padding: .65rem .875rem; font-size: .8rem; font-weight: 600;
-  color: #718096; cursor: pointer; transition: all .15s;
-  white-space: nowrap;
-}
-.modal-tabs button:hover { color: #1a202c; }
-.modal-tabs button.active { color: #1a365d; border-bottom-color: #3182ce; }
 .modal-body { padding: 1.25rem 1.5rem; }
 
-/* ── Success message ── */
-.success-msg {
-  color: #276749; background: #f0fff4; border-radius: 6px;
-  padding: .5rem .75rem; font-size: .82rem; font-weight: 600; margin-bottom: .75rem;
-}
-
-/* ── Sheets how-to ── */
-.howto-details { margin-bottom: 1rem; }
-.howto-details summary {
-  font-size: .85rem; font-weight: 600; color: #3182ce;
-  cursor: pointer; padding: .4rem 0; user-select: none;
-}
+/* ── Hosting how-to steps ── */
 .howto-steps {
-  padding: .75rem 0 .75rem 1.25rem;
-  font-size: .82rem; color: #4a5568;
-  display: flex; flex-direction: column; gap: .4rem;
-}
-.code-block-wrap { position: relative; margin-top: .75rem; }
-.btn-copy {
-  position: absolute; top: .5rem; right: .5rem;
-  background: #fff; border: 1px solid #e2e8f0;
-  border-radius: 5px; padding: .25rem .6rem;
-  font-size: .75rem; cursor: pointer; z-index: 1;
-  transition: background .15s;
-}
-.btn-copy:hover { background: #f7fafc; }
-.code-block {
-  background: #1a202c; color: #e2e8f0;
-  border-radius: 8px; padding: 1rem;
-  font-size: .72rem; overflow-x: auto;
-  white-space: pre; line-height: 1.5;
-  margin: 0;
+  padding: .25rem 0 .25rem 1.25rem;
+  font-size: .875rem; color: #4a5568;
+  display: flex; flex-direction: column; gap: .6rem;
+  line-height: 1.5;
 }
 
 /* ── Sync status ── */
 .sync-status {
   background: #f0fff4; color: #276749; border-radius: 7px;
   padding: .5rem .875rem; font-size: .82rem; font-weight: 600;
-  margin-bottom: .75rem;
+  margin-top: .75rem;
 }
 .sync-error { background: #fff5f5; color: #c53030; }
 
@@ -135,6 +118,20 @@ body {
 }
 .icon-btn:hover { background: rgba(255,255,255,.22); }
 .icon-btn-danger:hover { background: rgba(220,38,38,.5); border-color: rgba(220,38,38,.5); }
+
+/* ── User chip in header ── */
+.user-chip { display: flex; align-items: center; gap: .4rem; }
+.user-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.4);
+  flex-shrink: 0;
+}
+.user-name {
+  font-size: .82rem; color: rgba(255,255,255,.9);
+  font-weight: 500; max-width: 90px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+@media (max-width: 480px) { .user-name { display: none; } }
 
 /* ── Sheets button ── */
 .btn-sheets { color: #276749; border-color: #9ae6b4; }
@@ -326,6 +323,7 @@ input:focus, select:focus {
   transition: all .15s;
 }
 .btn-secondary:hover { background: #f9fafb; border-color: #9ca3af; }
+.btn-secondary:disabled { opacity: .5; cursor: not-allowed; }
 
 .btn-icon {
   background: transparent;
