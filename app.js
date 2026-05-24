@@ -789,6 +789,22 @@ function app() {
     cname(id) { return this.companies.find(c=>c.id===id)?.name ?? '?'; },
     previewTotal() { return this.fmt(this.calcMinutes(this.form)); },
 
+    dayName(iso) {
+      const days = this.lang === 'pt'
+        ? ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
+        : ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      return days[new Date(iso + 'T12:00:00').getDay()];
+    },
+    dayNum(iso) {
+      return iso.slice(8);
+    },
+    entryTimeLine(e) {
+      const lunch = e.noLunch
+        ? (this.lang === 'pt' ? 'sem almoço' : 'no lunch')
+        : `${this.lang === 'pt' ? 'almoço' : 'lunch'} ${e.lunchOut}–${e.lunchReturn}`;
+      return `${e.entryTime} → ${e.exitTime} · ${lunch}`;
+    },
+
     validateForm() {
       if (!this.form.companyId) return this.t('errorNoCompany');
       if (!this.form.date) return this.t('errorNoDate');
