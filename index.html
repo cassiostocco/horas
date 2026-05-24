@@ -21,7 +21,13 @@
 ════════════════════════════════════════════════════════════ -->
 <div class="auth-overlay" x-show="!gauth.unlocked" x-transition>
   <div class="auth-card">
-    <div class="auth-logo">⏱</div>
+    <div class="auth-logo">
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none"
+       stroke="#059669" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <path d="M12 6v6l4 2"/>
+  </svg>
+</div>
     <h1 class="auth-app-title" x-text="t('appTitle')"></h1>
 
     <button class="lang-btn auth-lang" @click="toggleLang()" x-text="lang==='pt'?'EN':'PT'"></button>
@@ -90,13 +96,31 @@
     <h1 x-text="t('appTitle')"></h1>
     <div class="header-actions">
       <button class="lang-btn" @click="toggleLang()" x-text="lang==='pt'?'EN':'PT'"></button>
-      <button class="icon-btn" @click="showSettings=true" title="Configurações">⚙</button>
+      <button class="icon-btn" @click="showSettings=true" title="Configurações">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+  </svg>
+</button>
       <div class="user-chip" x-show="gauth.user">
         <img class="user-avatar" :src="gauth.user?.picture" :alt="gauth.user?.name">
         <span class="user-name" x-text="gauth.user?.name?.split(' ')[0]"></span>
       </div>
-      <span class="sync-dot" x-show="syncStatus==='syncing'" title="Sincronizando...">↻</span>
-      <button class="icon-btn icon-btn-danger" @click="signOut()" :title="t('logout')">⏻</button>
+      <span class="sync-dot" x-show="syncStatus==='syncing'" title="Sincronizando...">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 12a9 9 0 1 1-2.63-6.36"/>
+    <path d="M21 4v6h-6"/>
+  </svg>
+</span>
+      <button class="icon-btn icon-btn-danger" @click="signOut()" :title="t('logout')">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 3v9"/>
+    <path d="M7.07 5.93A9 9 0 1 0 16.93 5.93"/>
+  </svg>
+</button>
     </div>
   </div>
   <nav>
@@ -120,9 +144,19 @@
     <!-- Week overview -->
     <div class="card week-card">
       <div class="week-nav-bar">
-        <button class="btn-icon" @click="weekNav--">&#8592;</button>
+        <button class="btn-icon" @click="weekNav--">
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M15 18l-6-6 6-6"/>
+  </svg>
+</button>
         <span class="week-nav-label" x-text="weekNavLabel()"></span>
-        <button class="btn-icon" @click="weekNav++" :disabled="weekNav >= 0">&#8594;</button>
+        <button class="btn-icon" @click="weekNav++" :disabled="weekNav >= 0">
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 18l6-6-6-6"/>
+  </svg>
+</button>
         <button class="btn-icon week-today-btn" x-show="weekNav < 0" @click="weekNav = 0"
           x-text="t('today')"></button>
       </div>
@@ -143,7 +177,13 @@
       <h2 x-text="editingId ? t('editEntry') : t('newEntry')"></h2>
       <div class="info-msg" x-show="companies.length===0" x-text="t('noCompanyForEntry')"></div>
       <div x-show="companies.length>0">
-        <button class="btn-fill-defaults" x-show="!editingId" @click="applyDefaults()" x-text="t('fillDefaults')"></button>
+        <button class="btn-fill-defaults" x-show="!editingId" @click="applyDefaults()">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M13 5H3M17 12H3M13 19H3M21 12l-4-4v8l4-4z"/>
+  </svg>
+  <span x-text="t('fillDefaults')"></span>
+</button>
         <div class="form-grid">
           <div class="field">
             <label class="field-label" x-text="t('company')"></label>
@@ -186,6 +226,11 @@
           </div>
         </div>
         <div class="day-preview" x-show="form.entryTime && form.exitTime">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 6v6l3 3"/>
+          </svg>
           <span x-text="t('dayTotal') + ': ' + previewTotal()"></span>
         </div>
         <div class="form-actions">
