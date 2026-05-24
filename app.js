@@ -712,7 +712,7 @@ function app() {
       const offset = day === 0 ? -6 : 1 - day;
       const mon = new Date(d);
       mon.setDate(d.getDate() + offset);
-      return mon.toISOString().slice(0,10);
+      return localIso(mon);
     },
 
     // ── time input helpers ───────────────────────────────────
@@ -756,7 +756,7 @@ function app() {
       return Array.from({length: 6}, (_, i) => {
         const d = new Date(mon);
         d.setDate(mon.getDate() + i);
-        const iso = d.toISOString().slice(0, 10);
+        const iso = localIso(d);
         const dayEntries = this.entries.filter(e => e.date === iso);
         const total = dayEntries.reduce((s, e) => s + this.calcMinutes(e), 0);
         return {
@@ -1057,4 +1057,10 @@ function app() {
 function uid() {
   return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)+Date.now().toString(36);
 }
-function todayStr() { return new Date().toISOString().slice(0,10); }
+function localIso(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+function todayStr() { return localIso(new Date()); }
