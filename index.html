@@ -244,38 +244,28 @@
     <div class="card">
       <h2 x-text="t('recentEntries')"></h2>
       <div class="empty" x-show="entries.length===0" x-text="t('noEntries')"></div>
-      <div class="table-wrap" x-show="entries.length>0">
-        <table>
-          <thead>
-            <tr>
-              <th x-text="t('date')"></th>
-              <th x-text="t('company')"></th>
-              <th x-text="t('entryTime')"></th>
-              <th x-text="t('lunchOut')"></th>
-              <th x-text="t('lunchReturn')"></th>
-              <th x-text="t('exitTime')"></th>
-              <th x-text="t('total')"></th>
-              <th x-text="t('actions')"></th>
-            </tr>
-          </thead>
-          <tbody>
-            <template x-for="e in sortedEntries()" :key="e.id">
-              <tr>
-                <td x-text="fmtDateWithDay(e.date)"></td>
-                <td x-text="cname(e.companyId)"></td>
-                <td x-text="e.entryTime"></td>
-                <td x-text="e.noLunch ? '—' : (e.lunchOut||'—')"></td>
-                <td x-text="e.noLunch ? '—' : (e.lunchReturn||'—')"></td>
-                <td x-text="e.exitTime"></td>
-                <td x-text="fmt(calcMinutes(e))"></td>
-                <td>
-                  <button class="btn-icon" @click="editEntry(e.id)" x-text="t('edit')"></button>
-                  <button class="btn-icon btn-danger" @click="deleteEntry(e.id)" x-text="t('delete')"></button>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
+      <div class="entries-list" x-show="entries.length>0">
+        <template x-for="e in sortedEntries()" :key="e.id">
+          <div class="entry-row"
+               x-transition:enter-start="entry-slide-start"
+               x-transition:enter-end="entry-slide-end">
+            <div class="entry-date-badge">
+              <span class="badge-day-name" x-text="dayName(e.date)"></span>
+              <span class="badge-day-num" x-text="dayNum(e.date)"></span>
+            </div>
+            <div class="entry-info">
+              <div class="entry-company" x-text="cname(e.companyId)"></div>
+              <div class="entry-times" x-text="entryTimeLine(e)"></div>
+            </div>
+            <div class="entry-right">
+              <div class="entry-total" x-text="fmt(calcMinutes(e))"></div>
+              <div class="entry-actions">
+                <button class="act-btn" @click="editEntry(e.id)" x-text="t('edit')"></button>
+                <button class="act-btn danger" @click="deleteEntry(e.id)">✕</button>
+              </div>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
   </div>
